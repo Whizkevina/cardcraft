@@ -20,7 +20,7 @@ export default function Navbar() {
   const isActive = (href: string) => location === href;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-card/80 backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b border-border bg-card">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14">
         {/* Logo */}
         <Link href="/">

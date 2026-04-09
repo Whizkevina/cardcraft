@@ -159,7 +159,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // Session — secure cookie in production
   app.use(
     session({
-      secret: process.env.SESSION_SECRET || (isProd ? undefined as any : "dev-secret-change-in-prod"),
+      secret: process.env.SESSION_SECRET || "cardcraft-fallback-secret-change-in-prod",
       resave: false,
       saveUninitialized: false,
       cookie: {

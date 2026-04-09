@@ -314,7 +314,18 @@ export default function Editor() {
       if (meta && (e.key === "y" || (e.key === "z" && e.shiftKey))) { e.preventDefault(); redo(); }
       if (e.key === "Delete" || e.key === "Backspace") {
         const active = fabricRef.current?.getActiveObject();
-        if (active && active.type !== "i-text") { fabricRef.current?.remove(active); fabricRef.current?.renderAll(); setSelectedObj(null); }
+        // Only delete object if:
+        // 1. There is an active object
+        // 2. It is NOT a text object currently in edit mode (user typing)
+        // 3. The focused element is NOT an input/textarea (panel fields)
+        const focusedTag = (document.activeElement as HTMLElement)?.tagName?.toLowerCase();
+        const isInputFocused = focusedTag === "input" || focusedTag === "textarea";
+        const isTextEditing = active?.type === "i-text" && (active as any).isEditing;
+        if (active && !isTextEditing && !isInputFocused) {
+          fabricRef.current?.remove(active);
+          fabricRef.current?.renderAll();
+          setSelectedObj(null);
+        }
       }
     };
     window.addEventListener("keydown", handler);
@@ -377,18 +388,102 @@ export default function Editor() {
     const file = e.target.files?.[0];
     if (!file || !fabricRef.current) return;
     const f = (window as any).fabric;
+    const canvas = fabricRef.current;
     const reader = new FileReader();
     reader.onload = (ev) => {
       const img = new Image();
       img.crossOrigin = "anonymous";
       img.onload = () => {
-        const maxPx = isLogo ? 80 : 160;
-        const scale = Math.min(maxPx / img.width, maxPx / img.height);
-        const fabricImg = new f.Image(img);
-        fabricImg.set({ left: 20, top: 20, scaleX: scale, scaleY: scale });
-        fabricRef.current.add(fabricImg);
-        fabricRef.current.setActiveObject(fabricImg);
-        fabricRef.current.renderAll();
+        // ── Canva-style: if a photo_frame is selected or exists, snap into it ──
+        const frameObj = (() => {
+          const active = canvas.getActiveObject();
+          // Selected object is a frame → use it
+          if (active?.customType === "photo_frame" || active?.customType === "logo") return active;
+          if (isLogo) {
+            // Find first logo zone
+            return canvas.getObjects().find((o: any) => o.customType === "logo") || null;
+          }
+          // Find first photo_frame
+          return canvas.getObjects().find((o: any) => o.customType === "photo_frame") || null;
+        })();
+
+        if (frameObj) {
+          // ── Frame dimensions in canvas coordinates ──
+          const fw = (frameObj.width  || 100) * (frameObj.scaleX || 1);
+          const fh = (frameObj.height || frameObj.radius ? (frameObj.radius! * 2) : 100) * (frameObj.scaleY || 1);
+          const fx = frameObj.left || 0;
+          const fy = frameObj.top  || 0;
+          const frameAngle = frameObj.angle || 0;
+
+          // Cover-fit: scale image so it fills the frame (like CSS background-size: cover)
+          const scaleX = fw / img.width;
+          const scaleY = fh / img.height;
+          const scale  = Math.max(scaleX, scaleY);
+
+          const scaledW = img.width  * scale;
+          const scaledH = img.height * scale;
+
+          // Center the image within the frame
+          const offsetX = (scaledW - fw) / 2;
+          const offsetY = (scaledH - fh) / 2;
+
+          const fabricImg = new f.Image(img, {
+            left: fx - offsetX / scale,
+            top:  fy - offsetY / scale,
+            scaleX: scale,
+            scaleY: scale,
+            angle: frameAngle,
+            customType: isLogo ? "logo_image" : "photo_image",
+          });
+
+          // ── Apply clip path matching the frame's shape ──
+          if (frameObj.type === "circle" || (frameObj.rx && frameObj.rx >= (Math.min(frameObj.width || 100, frameObj.height || 100) / 2) * 0.9)) {
+            // Circular frame → circular clip
+            const clipR = Math.min(fw, fh) / 2 / scale;
+            fabricImg.clipPath = new f.Circle({
+              radius: clipR,
+              left:  -clipR + offsetX / scale,
+              top:   -clipR + offsetY / scale,
+              absolutePositioned: false,
+            });
+          } else if (frameObj.rx && frameObj.rx > 4) {
+            // Rounded rect frame → rounded clip
+            const clipRx = (frameObj.rx * (frameObj.scaleX || 1)) / scale;
+            fabricImg.clipPath = new f.Rect({
+              width:  fw / scale,
+              height: fh / scale,
+              rx: clipRx, ry: clipRx,
+              left:  offsetX / scale,
+              top:   offsetY / scale,
+              absolutePositioned: false,
+            });
+          } else {
+            // Plain rect frame → rect clip
+            fabricImg.clipPath = new f.Rect({
+              width:  fw / scale,
+              height: fh / scale,
+              left:  offsetX / scale,
+              top:   offsetY / scale,
+              absolutePositioned: false,
+            });
+          }
+
+          // Place image just above the frame in the layer stack
+          canvas.remove(frameObj);
+          canvas.add(fabricImg);
+          canvas.setActiveObject(fabricImg);
+        } else {
+          // ── No frame found — free placement ──
+          const maxPx = isLogo ? 80 : 160;
+          const scale = Math.min(maxPx / img.width, maxPx / img.height);
+          const fabricImg = new f.Image(img, {
+            left: 30, top: 30, scaleX: scale, scaleY: scale,
+            customType: isLogo ? "logo_image" : "photo_image",
+          });
+          canvas.add(fabricImg);
+          canvas.setActiveObject(fabricImg);
+        }
+        canvas.renderAll();
       };
       img.src = ev.target?.result as string;
     };
@@ -607,7 +702,7 @@ export default function Editor() {
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-background">
       {/* ── TOP BAR ──────────────────────────────────────────────────────── */}
-      <header className="flex items-center justify-between px-3 sm:px-4 h-12 border-b border-border bg-card/90 backdrop-blur flex-shrink-0 z-30">
+      <header className="flex items-center justify-between px-3 sm:px-4 h-12 border-b border-border bg-card flex-shrink-0 z-30">
         <div className="flex items-center gap-1.5">
           <Link href="/templates">
             <a className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors text-sm p-1.5 rounded-md hover:bg-secondary" data-testid="button-back">
@@ -671,7 +766,7 @@ export default function Editor() {
       <div className="flex flex-1 overflow-hidden">
 
         {/* ── LEFT PANEL ──────────────────────────────────────────────────── */}
-        <aside className="hidden lg:flex flex-col w-52 border-r border-border bg-card flex-shrink-0 overflow-y-auto">
+        <aside className="hidden lg:flex flex-col w-52 border-r border-border bg-card flex-shrink-0 overflow-y-auto editor-panel">
           <div className="p-3 border-b border-border">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Layers</p>
           </div>
@@ -753,7 +848,7 @@ export default function Editor() {
         </main>
 
         {/* ── RIGHT PANEL ─────────────────────────────────────────────────── */}
-        <aside className="hidden lg:flex flex-col w-64 border-l border-border bg-card flex-shrink-0 overflow-y-auto">
+        <aside className="hidden lg:flex flex-col w-64 border-l border-border bg-card flex-shrink-0 overflow-y-auto editor-panel">
           <Tabs defaultValue="style" className="flex-1 flex flex-col">
             <TabsList className="w-full rounded-none border-b border-border h-10 bg-card">
               <TabsTrigger value="style" className="flex-1 text-xs rounded-none data-[state=active]:bg-secondary">Style</TabsTrigger>

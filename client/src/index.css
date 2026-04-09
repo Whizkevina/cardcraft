@@ -1,84 +1,82 @@
 @tailwind base;
-@tailwind components;
 @tailwind utilities;
+@tailwind components;
 
 @layer base {
   :root {
-    /* Card-making app: warm gold accents, deep jewel tones, professional */
-    --background: 240 20% 7%;
-    --foreground: 45 15% 92%;
+    /* ── Dark theme (default) ── warm dark with gold accent ── */
+    --background: 224 16% 10%;
+    --foreground: 42 18% 90%;
 
-    --card: 240 18% 11%;
-    --card-foreground: 45 15% 92%;
+    --card: 224 14% 14%;
+    --card-foreground: 42 18% 88%;
 
-    --popover: 240 18% 11%;
-    --popover-foreground: 45 15% 92%;
+    --popover: 224 14% 14%;
+    --popover-foreground: 42 18% 88%;
 
-    --primary: 43 96% 58%;
-    --primary-foreground: 240 20% 7%;
+    --primary: 43 90% 54%;
+    --primary-foreground: 224 16% 8%;
 
-    --secondary: 240 15% 18%;
-    --secondary-foreground: 45 15% 80%;
+    --secondary: 224 12% 20%;
+    --secondary-foreground: 42 14% 72%;
 
-    --muted: 240 15% 16%;
-    --muted-foreground: 240 8% 55%;
+    --muted: 224 12% 18%;
+    --muted-foreground: 42 10% 56%;
 
-    --accent: 43 96% 58%;
-    --accent-foreground: 240 20% 7%;
+    --accent: 43 90% 54%;
+    --accent-foreground: 224 16% 8%;
 
-    --destructive: 0 72% 50%;
-    --destructive-foreground: 45 15% 92%;
+    --destructive: 0 68% 54%;
+    --destructive-foreground: 42 18% 90%;
 
-    --border: 240 12% 22%;
-    --input: 240 12% 18%;
-    --ring: 43 96% 58%;
+    --border: 224 10% 22%;
+    --input: 224 10% 18%;
+    --ring: 43 90% 54%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 240 22% 9%;
-    --sidebar-foreground: 45 15% 82%;
-    --sidebar-primary: 43 96% 58%;
-    --sidebar-primary-foreground: 240 20% 7%;
-    --sidebar-accent: 240 15% 16%;
-    --sidebar-accent-foreground: 45 15% 82%;
-    --sidebar-border: 240 12% 20%;
-    --sidebar-ring: 43 96% 58%;
+    --sidebar-background: 224 16% 11%;
+    --sidebar-foreground: 42 14% 80%;
+    --sidebar-primary: 43 90% 54%;
+    --sidebar-primary-foreground: 224 16% 8%;
+    --sidebar-accent: 224 12% 18%;
+    --sidebar-accent-foreground: 42 14% 80%;
+    --sidebar-border: 224 10% 20%;
+    --sidebar-ring: 43 90% 54%;
 
-    /* Custom tokens */
-    --gold: 43 96% 58%;
-    --gold-dim: 43 60% 45%;
-    --canvas-bg: 240 8% 14%;
+    --gold: 43 90% 54%;
+    --canvas-bg: 224 12% 13%;
   }
 
   .light {
-    --background: 45 25% 97%;
-    --foreground: 240 20% 12%;
-    --card: 45 20% 99%;
-    --card-foreground: 240 20% 12%;
-    --popover: 45 20% 99%;
-    --popover-foreground: 240 20% 12%;
-    --primary: 43 90% 42%;
-    --primary-foreground: 45 25% 97%;
-    --secondary: 45 15% 92%;
-    --secondary-foreground: 240 20% 20%;
-    --muted: 45 12% 93%;
-    --muted-foreground: 240 8% 45%;
-    --accent: 43 90% 42%;
-    --accent-foreground: 45 25% 97%;
-    --destructive: 0 72% 50%;
-    --destructive-foreground: 45 25% 97%;
-    --border: 45 12% 85%;
-    --input: 45 12% 88%;
-    --ring: 43 90% 42%;
-    --sidebar-background: 45 20% 95%;
-    --sidebar-foreground: 240 20% 20%;
-    --sidebar-primary: 43 90% 42%;
-    --sidebar-primary-foreground: 45 25% 97%;
-    --sidebar-accent: 45 15% 90%;
-    --sidebar-accent-foreground: 240 20% 20%;
-    --sidebar-border: 45 12% 85%;
-    --sidebar-ring: 43 90% 42%;
-    --canvas-bg: 45 10% 88%;
+    --background: 42 20% 97%;
+    --foreground: 224 22% 14%;
+    --card: 42 16% 100%;
+    --card-foreground: 224 22% 14%;
+    --popover: 42 16% 100%;
+    --popover-foreground: 224 22% 14%;
+    --primary: 43 86% 42%;
+    --primary-foreground: 42 20% 97%;
+    --secondary: 42 14% 92%;
+    --secondary-foreground: 224 18% 22%;
+    --muted: 42 12% 93%;
+    --muted-foreground: 224 10% 42%;
+    --accent: 43 86% 42%;
+    --accent-foreground: 42 20% 97%;
+    --destructive: 0 68% 50%;
+    --destructive-foreground: 42 20% 97%;
+    --border: 42 12% 84%;
+    --input: 42 12% 88%;
+    --ring: 43 86% 42%;
+    --sidebar-background: 42 14% 94%;
+    --sidebar-foreground: 224 18% 22%;
+    --sidebar-primary: 43 86% 42%;
+    --sidebar-primary-foreground: 42 20% 97%;
+    --sidebar-accent: 42 12% 90%;
+    --sidebar-accent-foreground: 224 18% 22%;
+    --sidebar-border: 42 12% 84%;
+    --sidebar-ring: 43 86% 42%;
+    --canvas-bg: 42 10% 88%;
   }
 }
 
@@ -100,45 +98,75 @@
     font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
     min-height: 100dvh;
     line-height: 1.6;
+    font-size: 15px;
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Boska', 'Georgia', serif;
     text-wrap: balance;
     line-height: 1.2;
+    color: hsl(var(--foreground));
+  }
+
+  p {
+    color: hsl(var(--foreground) / 0.85);
   }
 }
 
-/* ── Scrollbar ──────────────────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 6px; height: 6px; }
+/* ── Scrollbar ─────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 999px; }
 ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground)); }
 
-/* ── Gold accent utilities ─────────────────────────────────────────────── */
+/* ── Gold accent ───────────────────────────────────────────────────────────── */
 .text-gold { color: hsl(var(--gold)); }
-.bg-gold { background-color: hsl(var(--gold)); }
-.border-gold { border-color: hsl(var(--gold)); }
+.bg-gold    { background-color: hsl(var(--gold)); }
+.border-gold{ border-color: hsl(var(--gold)); }
 
-/* ── Canvas area ────────────────────────────────────────────────────────── */
+/* ── Animated logo gradient ────────────────────────────────────────────────── */
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50%       { background-position: 100% 50%; }
+}
+.logo-text {
+  background: linear-gradient(90deg, hsl(43 96% 70%), hsl(43 80% 52%), hsl(43 96% 70%));
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gradient-shift 3.5s ease infinite;
+}
+.light .logo-text {
+  background: linear-gradient(90deg, hsl(43 86% 38%), hsl(43 70% 48%), hsl(43 86% 38%));
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: gradient-shift 3.5s ease infinite;
+}
+
+/* ── Canvas dotted background ──────────────────────────────────────────────── */
 .canvas-wrap {
-  background: hsl(var(--canvas-bg));
-  background-image: 
-    radial-gradient(circle, hsl(var(--border) / 0.5) 1px, transparent 1px);
-  background-size: 24px 24px;
+  background-color: hsl(var(--canvas-bg));
+  background-image: radial-gradient(circle, hsl(var(--border) / 0.6) 1px, transparent 1px);
+  background-size: 22px 22px;
 }
 
-/* ── Panel glass effect ─────────────────────────────────────────────────── */
-.panel-glass {
-  background: hsl(var(--card) / 0.95);
-  backdrop-filter: blur(12px);
-  border: 1px solid hsl(var(--border));
+/* ── Template card hover — subtle lift only ────────────────────────────────── */
+.template-card {
+  transition:
+    transform 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.template-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px hsl(43 90% 54% / 0.12);
 }
 
-/* ── Shimmer skeleton ───────────────────────────────────────────────────── */
+/* ── Shimmer skeleton ──────────────────────────────────────────────────────── */
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
 }
 .skeleton {
   background: linear-gradient(
@@ -148,55 +176,40 @@
     hsl(var(--muted)) 75%
   );
   background-size: 200% 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
-  border-radius: 4px;
+  animation: shimmer 1.6s ease-in-out infinite;
+  border-radius: 6px;
 }
 
-/* ── Template card hover ────────────────────────────────────────────────── */
-.template-card {
-  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
-              box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-.template-card:hover {
-  transform: translateY(-4px) scale(1.01);
-  box-shadow: 0 20px 48px hsl(43 96% 58% / 0.18);
-}
-
-/* ── Fabric canvas fixes ────────────────────────────────────────────────── */
+/* ── Fabric canvas container ───────────────────────────────────────────────── */
 .canvas-container {
   margin: 0 auto !important;
 }
 
-/* ── Mobile bottom sheet ─────────────────────────────────────────────────── */
-.bottom-sheet {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 50;
-  background: hsl(var(--card));
-  border-top: 1px solid hsl(var(--border));
-  border-radius: 16px 16px 0 0;
-  padding: 16px;
-  max-height: 60vh;
-  overflow-y: auto;
-  transform: translateY(100%);
-  transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-.bottom-sheet.open {
-  transform: translateY(0);
+/* ── Editor panels — solid, no blur ───────────────────────────────────────── */
+/* Panels are opaque for readability; no frosted glass effect */
+.editor-panel {
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
 }
 
-/* ── Animated gradient logo text ────────────────────────────────────────── */
-@keyframes gradient-shift {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
+/* ── Better text contrast in muted slots ───────────────────────────────────── */
+.text-muted-foreground {
+  /* Override Tailwind default to a slightly higher contrast value */
+  color: hsl(var(--muted-foreground)) !important;
 }
-.logo-text {
-  background: linear-gradient(90deg, hsl(43 96% 68%), hsl(43 80% 55%), hsl(43 96% 68%));
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  animation: gradient-shift 3s ease infinite;
+
+/* ── Focus ring ────────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Reduced motion ────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
