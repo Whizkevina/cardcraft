@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1208"/>
+      <stop offset="100%" style="stop-color:#0f0c06"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="20%" cy="30%" r="50%">
+      <stop offset="0%" style="stop-color:#C9A84C;stop-opacity:0.12"/>
+      <stop offset="100%" style="stop-color:#000;stop-opacity:0"/>
+    </radialGradient>
+    <linearGradient id="ul" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#C9A84C"/>
+      <stop offset="100%" style="stop-color:#C9A84C;stop-opacity:0"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+  <!-- Card decoration -->
+  <rect x="80" y="120" width="260" height="340" rx="16" fill="rgba(201,168,76,0.1)" stroke="rgba(201,168,76,0.4)" stroke-width="1.5"/>
+  <!-- Logo badge -->
+  <rect x="88" y="128" width="48" height="48" rx="24" fill="#C9A84C"/>
+  <text x="112" y="158" font-family="Georgia,serif" font-size="22" font-weight="bold" fill="#1a1208" text-anchor="middle">C</text>
+  <!-- Card lines -->
+  <line x1="100" y1="352" x2="320" y2="352" stroke="rgba(201,168,76,0.4)" stroke-width="1"/>
+  <rect x="100" y="368" width="160" height="10" rx="5" fill="rgba(201,168,76,0.35)"/>
+  <rect x="100" y="388" width="120" height="8" rx="4" fill="rgba(201,168,76,0.2)"/>
+  <!-- Main title -->
+  <text x="400" y="260" font-family="Georgia,serif" font-size="78" font-weight="bold" fill="#E8D8A0">CardCraft</text>
+  <rect x="400" y="278" width="520" height="4" rx="2" fill="url(#ul)"/>
+  <!-- Tagline -->
+  <text x="400" y="330" font-family="Georgia,serif" font-size="32" fill="rgba(232,216,160,0.7)">Design beautiful cards in minutes.</text>
+  <text x="400" y="375" font-family="Arial,sans-serif" font-size="24" fill="rgba(232,216,160,0.45)">20 templates · Photo upload · Download in HD</text>
+  <!-- CTA -->
+  <rect x="400" y="430" width="320" height="56" rx="12" fill="#C9A84C"/>
+  <text x="560" y="465" font-family="Arial,sans-serif" font-size="22" font-weight="bold" fill="#1a1208" text-anchor="middle">Start Designing — Free</text>
+  <!-- URL -->
+  <text x="1140" y="595" font-family="Arial,sans-serif" font-size="20" fill="rgba(201,168,76,0.4)" text-anchor="end">cardcraft.app</text>
+</svg>

@@ -14,7 +14,8 @@ import {
   AlignLeft, AlignCenter, AlignRight, Bold, Italic,
   ChevronUp, ChevronDown, Lock, Unlock, Trash2,
   Image as ImageIcon, RotateCcw, X, Undo2, Redo2,
-  ZoomIn, ZoomOut, Maximize, Wand2, Loader2 as SpinIcon
+  ZoomIn, ZoomOut, Maximize, Wand2, Loader2 as SpinIcon,
+  RefreshCw, MousePointer
 } from "lucide-react";
 import type { Template, Project } from "@shared/schema";
 import { SharePanel } from "../components/SharePanel";
@@ -75,6 +76,9 @@ export default function Editor() {
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [exportPreset, setExportPreset] = useState(EXPORT_PRESETS[0]);
+  const [isDirty, setIsDirty] = useState(false);
+  // ref to track replace-photo input for currently selected image
+  const replacePhotoInputRef = useRef<HTMLInputElement>(null);
 
   const params = useParams<{ templateId?: string; projectId?: string }>();
   const templateId = params.templateId || null;
@@ -162,9 +166,20 @@ export default function Editor() {
     canvas.on("selection:created", (e: any) => setSelectedObj(e.selected?.[0] || null));
     canvas.on("selection:updated", (e: any) => setSelectedObj(e.selected?.[0] || null));
     canvas.on("selection:cleared", () => setSelectedObj(null));
-    canvas.on("object:modified", () => { setSelectedObj(canvas.getActiveObject()); saveHistory(); });
-    canvas.on("object:added", saveHistory);
-    canvas.on("object:removed", saveHistory);
+    canvas.on("object:modified", () => { setSelectedObj(canvas.getActiveObject()); saveHistory(); setIsDirty(true); });
+    canvas.on("object:added", () => { saveHistory(); setIsDirty(true); });
+    canvas.on("object:removed", () => { saveHistory(); setIsDirty(true); });
+
+    // Single-click selects, double-click enters text edit mode
+    canvas.on("mouse:dblclick", (opt: any) => {
+      const target = opt.target;
+      if (target && (target.type === "i-text" || target.type === "text")) {
+        canvas.setActiveObject(target);
+        target.enterEditing();
+        target.selectAll();
+        canvas.renderAll();
+      }
+    });
 
     // Zoom with scroll
     canvas.on("mouse:wheel", (opt: any) => {
@@ -331,6 +346,52 @@ export default function Editor() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [undo, redo]);
+
+  // ─── Unsaved changes warning ────────────────────────────────────────
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (!isDirty) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty]);
+
+  // ─── Replace photo in-place ────────────────────────────────────────
+  const handleReplacePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const obj = fabricRef.current?.getActiveObject();
+    if (!file || !obj || obj.type !== "image" || !fabricRef.current) return;
+    const f = (window as any).fabric;
+    const canvas = fabricRef.current;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        // Preserve position, scale, angle, clipPath and customType
+        const newImg = new f.Image(img, {
+          left: obj.left,
+          top: obj.top,
+          scaleX: obj.scaleX,
+          scaleY: obj.scaleY,
+          angle: obj.angle || 0,
+          customType: obj.customType,
+          clipPath: obj.clipPath,
+        });
+        canvas.remove(obj);
+        canvas.add(newImg);
+        canvas.setActiveObject(newImg);
+        canvas.renderAll();
+        setSelectedObj(newImg);
+        setIsDirty(true);
+      };
+      img.src = ev.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
 
   // ─── Object manipulation ──────────────────────────────────────────────────
   const updateSelectedProp = (prop: string, value: any) => {
@@ -643,6 +704,7 @@ export default function Editor() {
     onSuccess: (data: any) => {
       if (data?.id && !projectId) setProjectId(data.id);
       qc.invalidateQueries({ queryKey: ["/api/projects"] });
+      setIsDirty(false);
       toast({ title: "Saved!", description: "Your card has been saved." });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
@@ -685,6 +747,11 @@ export default function Editor() {
   };
 
   // ─── Selected obj properties ──────────────────────────────────────────────
+  // ─── Photo frame hint ────────────────────────────────────────────────────────
+  const hasPhotoFrame = layers.some((o: any) => o.customType === "photo_frame");
+  const hasPhotoImage = layers.some((o: any) => o.customType === "photo_image" || o.customType === "logo_image");
+  const showPhotoHint = hasPhotoFrame && !hasPhotoImage;
+
   const isText = selectedObj?.type === "i-text" || selectedObj?.type === "text";
   const isImage = selectedObj?.type === "image";
   const imageRx = selectedObj?.rx || 0;
@@ -749,8 +816,8 @@ export default function Editor() {
           </Button>
           {user ? (
             <Button size="sm" onClick={() => saveProject.mutate()} disabled={saveProject.isPending}
-              className="gap-1.5 text-xs h-8 bg-primary text-primary-foreground hover:bg-primary/90" data-testid="button-save">
-              <Save size={13} /> {saveProject.isPending ? "Saving..." : "Save"}
+              className={`gap-1.5 text-xs h-8 ${isDirty ? "bg-amber-500 hover:bg-amber-600 text-white" : "bg-primary text-primary-foreground hover:bg-primary/90"}`} data-testid="button-save">
+              <Save size={13} /> {saveProject.isPending ? "Saving..." : isDirty ? "Save*" : "Saved"}
             </Button>
           ) : (
             <Link href="/auth">
@@ -809,8 +876,21 @@ export default function Editor() {
         {/* ── CANVAS ──────────────────────────────────────────────────────── */}
         <main className="flex-1 flex flex-col overflow-hidden">
           <div className="flex-1 overflow-auto canvas-wrap flex items-start justify-center p-6 sm:p-10">
-            <div className="shadow-2xl rounded-sm overflow-hidden flex-shrink-0">
+            <div className="shadow-2xl rounded-sm overflow-hidden flex-shrink-0 relative">
               <canvas ref={canvasRef} id="cardcraft-canvas" data-testid="canvas-editor" />
+              {/* Dirty indicator dot */}
+              {isDirty && (
+                <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-amber-400 shadow" title="Unsaved changes" />
+              )}
+              {/* Photo frame hint */}
+              {showPhotoHint && (
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 pointer-events-none">
+                  <div className="flex items-center gap-1.5 bg-black/60 text-white text-[11px] px-3 py-1.5 rounded-full backdrop-blur-sm">
+                    <ImageIcon size={11} />
+                    Click "Add Photo" to fill the photo frame
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -893,6 +973,16 @@ export default function Editor() {
                     <div className="space-y-3 pt-2 border-t border-border">
                       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Image</p>
 
+                      {/* Replace photo */}
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Replace Photo</Label>
+                        <label className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border border-border bg-secondary hover:bg-secondary/70 cursor-pointer transition-colors text-xs" data-testid="label-replace-photo">
+                          <RefreshCw size={13} className="text-primary" />
+                          Swap Photo
+                          <input type="file" accept="image/*" className="hidden" ref={replacePhotoInputRef} onChange={handleReplacePhoto} />
+                        </label>
+                      </div>
+
                       {/* Corner radius */}
                       <div className="space-y-1.5">
                         <Label className="text-xs text-muted-foreground">Corner Radius</Label>
@@ -972,8 +1062,18 @@ export default function Editor() {
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Font Family</Label>
                     <Select value={fontFamily} onValueChange={v => updateSelectedProp("fontFamily", v)}>
-                      <SelectTrigger className="h-8 text-xs" data-testid="select-font-family"><SelectValue /></SelectTrigger>
-                      <SelectContent>{FONTS.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent>
+                      <SelectTrigger className="h-8 text-xs" data-testid="select-font-family">
+                        <SelectValue>
+                          <span style={{ fontFamily }}>{fontFamily}</span>
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {FONTS.map(f => (
+                          <SelectItem key={f} value={f}>
+                            <span style={{ fontFamily: f }}>{f}</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
                     </Select>
                   </div>
 
@@ -1040,7 +1140,7 @@ export default function Editor() {
 
             {/* ── Export & Share tab ───────────────────────────────────── */}
             <TabsContent value="export" className="flex-1 p-3 mt-0 overflow-y-auto">
-              <SharePanel fabricRef={fabricRef} projectTitle={projectTitle} onQROpen={() => setQrOpen(true)} />
+              <SharePanel fabricRef={fabricRef} projectTitle={projectTitle} projectId={projectId} onQROpen={() => setQrOpen(true)} />
             </TabsContent>
           </Tabs>
         </aside>
@@ -1052,12 +1152,21 @@ export default function Editor() {
       {/* ── MOBILE BOTTOM SHEET ──────────────────────────────────────────── */}
       {mobilePanel && (
         <div className="fixed inset-0 z-50 lg:hidden" onClick={() => setMobilePanel(null)}>
-          <div className="absolute inset-0 bg-black/50" />
-          <div className="absolute bottom-0 left-0 right-0 bg-card border-t border-border rounded-t-2xl p-4 max-h-[65vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-sm capitalize">{mobilePanel}</h3>
-              <button onClick={() => setMobilePanel(null)}><X size={18} /></button>
+          <div className="absolute inset-0 bg-black/60" />
+          <div
+            className="absolute bottom-0 left-0 right-0 bg-card border-t border-border rounded-t-2xl flex flex-col"
+            style={{ maxHeight: "75vh" }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Drag handle */}
+            <div className="flex justify-center pt-2 pb-1 flex-shrink-0">
+              <div className="w-10 h-1 rounded-full bg-border" />
             </div>
+            <div className="flex items-center justify-between px-4 py-2 flex-shrink-0 border-b border-border">
+              <h3 className="font-semibold text-sm capitalize">{mobilePanel}</h3>
+              <button onClick={() => setMobilePanel(null)} className="p-1.5 rounded-full hover:bg-secondary"><X size={16} /></button>
+            </div>
+            <div className="overflow-y-auto flex-1 p-4">
 
             {mobilePanel === "style" && (
               <div className="space-y-4">
@@ -1107,9 +1216,10 @@ export default function Editor() {
 
             {mobilePanel === "export" && (
               <div>
-                <SharePanel fabricRef={fabricRef} projectTitle={projectTitle} onQROpen={() => { setMobilePanel(null); setQrOpen(true); }} />
+                <SharePanel fabricRef={fabricRef} projectTitle={projectTitle} projectId={projectId} onQROpen={() => { setMobilePanel(null); setQrOpen(true); }} />
               </div>
             )}
+            </div>{/* overflow scroll end */}
           </div>
         </div>
       )}

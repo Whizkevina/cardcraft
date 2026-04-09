@@ -213,3 +213,29 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── Mobile editor touch targets ───────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .editor-panel button,
+  .editor-panel label {
+    min-height: 40px;
+  }
+}
+
+/* ── Consistent action button heights ─────────────────────────────────────── */
+/* All icon-only action buttons in panels are 32px × 32px */
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  flex-shrink: 0;
+}
+
+/* ── Share page card shadow ────────────────────────────────────────────────── */
+.share-card-shadow {
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3);
+}

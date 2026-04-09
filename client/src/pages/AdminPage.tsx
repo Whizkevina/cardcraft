@@ -6,7 +6,8 @@ import Navbar from "../components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Shield, Plus, Eye, EyeOff, Trash2, Users, Sparkles, Crown, Search, TrendingUp, CreditCard, LayoutTemplate, UserPlus } from "lucide-react";
+import { Shield, Plus, Eye, EyeOff, Trash2, Users, Sparkles, Crown, Search, TrendingUp, CreditCard, LayoutTemplate, UserPlus, Pencil } from "lucide-react";
+import { Link } from "wouter";
 import type { Template } from "@shared/schema";
 import type { AuthUser } from "../components/AuthProvider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -42,6 +43,11 @@ function TemplateRow({ template, onToggle, onDelete }: { template: Template; onT
         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${template.status === "published" ? "bg-green-500/15 text-green-500" : "bg-secondary text-muted-foreground"}`}>
           {template.status}
         </span>
+        <Link href={`/editor/t/${template.id}`}>
+          <a className="p-1.5 rounded hover:bg-primary/20 text-muted-foreground hover:text-primary transition-colors" title="Edit in Editor" data-testid={`button-edit-template-${template.id}`}>
+            <Pencil size={14} />
+          </a>
+        </Link>
         <button onClick={() => onToggle(template.id, template.status === "published" ? "draft" : "published")}
           className="p-1.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors" data-testid={`button-toggle-template-${template.id}`}>
           {template.status === "published" ? <EyeOff size={14} /> : <Eye size={14} />}

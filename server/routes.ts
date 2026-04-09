@@ -3,6 +3,8 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import bcrypt from "bcryptjs";
 import session from "express-session";
+import SqliteStoreFactory from "better-sqlite3-session-store";
+import Database from "better-sqlite3";
 import nodemailer from "nodemailer";
 import https from "https";
 import crypto from "crypto";
@@ -157,8 +159,12 @@ const requireAdmin = (req: any, res: any, next: any) => {
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
   // Session — secure cookie in production
+  // SQLite-backed session store — survives server restarts
+  const SqliteStore = SqliteStoreFactory(session);
+  const sessionDb = new Database("sessions.db");
   app.use(
     session({
+      store: new SqliteStore({ client: sessionDb }),
       secret: process.env.SESSION_SECRET || "cardcraft-fallback-secret-change-in-prod",
       resave: false,
       saveUninitialized: false,
@@ -207,7 +213,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       req.session.userId = user.id;
       req.session.userRole = user.role;
       req.session.userTier = user.tier;
-      res.json(safeUser(user));
+      // Flag admin logging in with default password so frontend can prompt change
+      const isDefaultAdminPassword = user.role === "admin" && await bcrypt.compare("admin123", user.password);
+      const userObj = safeUser(user) as any;
+      if (isDefaultAdminPassword) userObj.needsPasswordChange = true;
+      res.json(userObj);
     } catch (e: any) { res.status(500).json({ error: "Login failed" }); }
   });
 
@@ -407,6 +417,22 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const p = storage.renameProject(id, req.session.userId!, title);
     if (!p) return res.status(404).json({ error: "Not found" });
     res.json(p);
+  });
+
+  // ─── Public project share (no auth required) ──────────────────────────────────
+  app.get("/api/projects/:id/share", (req, res) => {
+    const id = safeId(req.params.id);
+    if (!id) return res.status(400).json({ error: "Invalid ID" });
+    const p = storage.getProject(id);
+    if (!p) return res.status(404).json({ error: "Not found" });
+    // Return only safe fields — no userId exposed
+    res.json({
+      id: p.id,
+      title: p.title,
+      designJson: p.designJson,
+      thumbnail: p.thumbnail,
+      updatedAt: p.updatedAt,
+    });
   });
 
   // ─── Paystack ────────────────────────────────────────────────────────────────

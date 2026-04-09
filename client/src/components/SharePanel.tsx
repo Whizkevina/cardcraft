@@ -5,14 +5,12 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "./AuthProvider";
 import { apiRequest } from "@/lib/queryClient";
 import { Download, Share2, Copy, Link, Sparkles, Lock, QrCode, Mail, Loader2 } from "lucide-react";
-import { useState as useEmailState } from "react";
 
 const EXPORT_PRESETS = [
   { label: "Original (800×1000)", multiplier: 2 },
@@ -24,12 +22,13 @@ const EXPORT_PRESETS = [
 interface SharePanelProps {
   fabricRef: React.RefObject<any>;
   projectTitle: string;
+  projectId?: number | null;
   onQROpen: () => void;
 }
 
 const FREE_LIMIT = 3;
 
-export function SharePanel({ fabricRef, projectTitle, onQROpen }: SharePanelProps) {
+export function SharePanel({ fabricRef, projectTitle, projectId, onQROpen }: SharePanelProps) {
   const { user, isPro } = useAuth();
   const { toast } = useToast();
   const [preset, setPreset] = useState(EXPORT_PRESETS[0]);
@@ -163,12 +162,15 @@ export function SharePanel({ fabricRef, projectTitle, onQROpen }: SharePanelProp
     }
   };
 
-  // Copy shareable link (card project URL if saved, else current page)
+  // Copy shareable link — public /share/:id if saved, else editor URL
   const copyLink = async () => {
-    const url = window.location.href;
+    const base = window.location.origin + window.location.pathname.replace(/index\.html$/, "");
+    const url = projectId
+      ? `${base}#/share/${projectId}`
+      : window.location.href;
     try {
       await navigator.clipboard.writeText(url);
-      toast({ title: "Link copied!", description: "Share this link to open the card in the editor." });
+      toast({ title: "Link copied!", description: projectId ? "Anyone can view this card via the link." : "Share this link to open the card in the editor." });
     } catch {
       toast({ title: "Copy failed", variant: "destructive" });
     }
@@ -300,10 +302,10 @@ export function SharePanel({ fabricRef, projectTitle, onQROpen }: SharePanelProp
 
 // ─── Email send section ───────────────────────────────────────────────────────
 function EmailSendSection({ fabricRef, projectTitle, isPro }: { fabricRef: any; projectTitle: string; isPro: boolean }) {
-  const [email, setEmail] = useEmailState("");
-  const [message, setMessage] = useEmailState("");
-  const [sending, setSending] = useEmailState(false);
-  const [emailStatus, setEmailStatus] = useEmailState<"idle"|"success"|"error">("idle");
+  const [email, setEmail] = useState("");
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [emailStatus, setEmailStatus] = useState<"idle"|"success"|"error">("idle");
   const { toast } = useToast();
 
   const sendByEmail = async () => {

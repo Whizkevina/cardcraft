@@ -1,10 +1,11 @@
-import { Switch, Route, Router } from "wouter";
+import { Switch, Route, Router, useLocation } from "wouter";
 import { useHashLocation } from "wouter/use-hash-location";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { AuthProvider } from "./components/AuthProvider";
+import { useEffect, useRef, useState } from "react";
 
 import Landing from "./pages/Landing";
 import Gallery from "./pages/Gallery";
@@ -18,7 +19,39 @@ import PaymentsPage from "./pages/PaymentsPage";
 import AccountSettings from "./pages/AccountSettings";
 import ForgotPassword from "./pages/ForgotPassword";
 import LegalPage from "./pages/LegalPage";
+import SharePage from "./pages/SharePage";
 import NotFound from "./pages/not-found";
+
+// ─── Page fade-in transition wrapper ─────────────────────────────────────────
+function PageTransition({ children }: { children: React.ReactNode }) {
+  const [location] = useLocation();
+  const [visible, setVisible] = useState(false);
+  const prevLoc = useRef("");
+
+  useEffect(() => {
+    if (location !== prevLoc.current) {
+      prevLoc.current = location;
+      setVisible(false);
+      const t = requestAnimationFrame(() => {
+        requestAnimationFrame(() => setVisible(true));
+      });
+      return () => cancelAnimationFrame(t);
+    }
+  }, [location]);
+
+  // On mount make visible immediately
+  useEffect(() => { setVisible(true); }, []);
+
+  return (
+    <div style={{
+      opacity: visible ? 1 : 0,
+      transform: visible ? "translateY(0)" : "translateY(6px)",
+      transition: "opacity 0.18s ease, transform 0.18s ease",
+    }}>
+      {children}
+    </div>
+  );
+}
 
 export default function App() {
   return (
@@ -26,25 +59,28 @@ export default function App() {
       <ThemeProvider>
         <AuthProvider>
           <Router hook={useHashLocation}>
-            <Switch>
-              <Route path="/" component={Landing} />
-              <Route path="/templates" component={Gallery} />
-              <Route path="/editor" component={Editor} />
-              <Route path="/editor/t/:templateId" component={Editor} />
-              <Route path="/editor/p/:projectId" component={Editor} />
-              <Route path="/projects" component={Projects} />
-              <Route path="/bulk" component={BulkGenerate} />
-              <Route path="/pricing" component={PricingPage} />
-              <Route path="/payments" component={PaymentsPage} />
-              <Route path="/settings" component={AccountSettings} />
-              <Route path="/forgot-password" component={ForgotPassword} />
-              <Route path="/reset-password" component={ForgotPassword} />
-              <Route path="/terms" component={LegalPage} />
-              <Route path="/privacy" component={LegalPage} />
-              <Route path="/auth" component={AuthPage} />
-              <Route path="/admin" component={AdminPage} />
-              <Route component={NotFound} />
-            </Switch>
+            <PageTransition>
+              <Switch>
+                <Route path="/" component={Landing} />
+                <Route path="/templates" component={Gallery} />
+                <Route path="/editor" component={Editor} />
+                <Route path="/editor/t/:templateId" component={Editor} />
+                <Route path="/editor/p/:projectId" component={Editor} />
+                <Route path="/projects" component={Projects} />
+                <Route path="/bulk" component={BulkGenerate} />
+                <Route path="/pricing" component={PricingPage} />
+                <Route path="/payments" component={PaymentsPage} />
+                <Route path="/settings" component={AccountSettings} />
+                <Route path="/forgot-password" component={ForgotPassword} />
+                <Route path="/reset-password" component={ForgotPassword} />
+                <Route path="/terms" component={LegalPage} />
+                <Route path="/privacy" component={LegalPage} />
+                <Route path="/auth" component={AuthPage} />
+                <Route path="/admin" component={AdminPage} />
+                <Route path="/share/:id" component={SharePage} />
+                <Route component={NotFound} />
+              </Switch>
+            </PageTransition>
           </Router>
           <Toaster />
         </AuthProvider>
