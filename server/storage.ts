@@ -170,39 +170,26 @@ export class Storage implements IStorage {
   }
   getAnalytics(): { totalUsers: number; proUsers: number; totalCards: number; totalRevenue: number; cardsToday: number; signupsToday: number; topTemplates: any[]; recentSignups: any[] } {
     const today = new Date().toISOString().split("T")[0];
-    const allUsers = db.select().from(schema.users).all();
-    const allProjects = db.select().from(schema.projects).all();
-    const allPayments = db.select().from(schema.payments).all();
-    const allTemplates = db.select().from(schema.templates).all();
 
-    const totalRevenue = allPayments.filter(p => p.status === "success").reduce((sum, p) => sum + (p.amount / 100), 0);
-    const cardsToday = allProjects.filter(p => p.createdAt?.startsWith(today)).length;
-    const signupsToday = allUsers.filter(u => u.createdAt?.startsWith(today)).length;
+    // Use SQL aggregates — O(1) rather than loading all rows
+    const totalUsers = (sqlite.prepare("SELECT COUNT(*) as c FROM users").get() as any).c;
+    const proUsers   = (sqlite.prepare("SELECT COUNT(*) as c FROM users WHERE tier='pro'").get() as any).c;
+    const totalCards = (sqlite.prepare("SELECT COUNT(*) as c FROM projects").get() as any).c;
+    const totalRevenue = ((sqlite.prepare("SELECT COALESCE(SUM(amount),0) as s FROM payments WHERE status='success'").get() as any).s) / 100;
+    const cardsToday = (sqlite.prepare("SELECT COUNT(*) as c FROM projects WHERE created_at LIKE ?").get(today + "%") as any).c;
+    const signupsToday = (sqlite.prepare("SELECT COUNT(*) as c FROM users WHERE created_at LIKE ?").get(today + "%") as any).c;
 
-    // Top templates by usage
-    const usageMap: Record<number, number> = {};
-    allProjects.forEach(p => { if (p.templateId) usageMap[p.templateId] = (usageMap[p.templateId] || 0) + 1; });
-    const topTemplates = allTemplates
-      .map(t => ({ ...t, uses: usageMap[t.id] || 0 }))
-      .sort((a, b) => b.uses - a.uses)
-      .slice(0, 5);
+    // Top 5 templates by usage_count column (updated atomically)
+    const topTemplates = sqlite.prepare(
+      "SELECT id, title, category, thumbnail_color as thumbnailColor, usage_count as uses FROM templates WHERE status='published' ORDER BY usage_count DESC LIMIT 5"
+    ).all();
 
-    // Recent signups
-    const recentSignups = [...allUsers]
-      .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))
-      .slice(0, 8)
-      .map(u => ({ id: u.id, name: u.name, email: u.email, tier: u.tier, createdAt: u.createdAt }));
+    // Recent 8 signups
+    const recentSignups = sqlite.prepare(
+      "SELECT id, name, email, tier, created_at as createdAt FROM users ORDER BY created_at DESC LIMIT 8"
+    ).all();
 
-    return {
-      totalUsers: allUsers.length,
-      proUsers: allUsers.filter(u => u.tier === "pro").length,
-      totalCards: allProjects.length,
-      totalRevenue,
-      cardsToday,
-      signupsToday,
-      topTemplates,
-      recentSignups,
-    };
+    return { totalUsers, proUsers, totalCards, totalRevenue, cardsToday, signupsToday, topTemplates, recentSignups };
   }
   getAllTemplates(): Template[] {
     return db.select().from(schema.templates).orderBy(desc(schema.templates.id)).all();
@@ -237,7 +224,8 @@ export class Storage implements IStorage {
       .where(eq(schema.payments.reference, reference)).returning().get();
   }
   incrementTemplateUsage(templateId: number): void {
-    db.update(schema.templates).set({ usageCount: (db.select().from(schema.templates).where(eq(schema.templates.id, templateId)).get()?.usageCount || 0) + 1 }).where(eq(schema.templates.id, templateId)).run();
+    // Atomic SQL increment — avoids read-modify-write race condition
+    sqlite.prepare("UPDATE templates SET usage_count = usage_count + 1 WHERE id = ?").run(templateId);
   }
   duplicateProject(id: number, userId: number): Project | undefined {
     const original = this.getProject(id);
