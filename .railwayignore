@@ -1,0 +1,7 @@
+# Skip development-only files to speed up Railway builds
+*.db
+*.db-shm
+*.db-wal
+.env
+.env.local
+dist/

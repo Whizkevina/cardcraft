@@ -125,19 +125,35 @@ SESSION_SECRET=change-this-to-a-secure-random-string
 
 ## 🌍 Deployment Options
 
-### Option 1 — Railway (Recommended for full-stack)
+### Option 1 — Railway (Recommended ⭐)
 
-Railway supports Node.js + SQLite with persistent storage.
+Railway supports Node.js + SQLite with zero configuration — `railway.toml` is already included in this repo.
 
-1. Push code to GitHub
-2. Go to [railway.app](https://railway.app) → New Project → Deploy from GitHub
-3. Select this repo
-4. Add environment variables in the Railway dashboard
-5. Railway auto-detects `npm run build` and `node dist/index.cjs`
-6. Your app gets a free `.railway.app` subdomain (or attach a custom domain)
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template/new?referralCode=cardcraft)
 
-**Start command:** `NODE_ENV=production node dist/index.cjs`
-**Build command:** `npm run build`
+**Step-by-step:**
+
+1. Go to [railway.app](https://railway.app) and sign up / log in
+2. Click **New Project → Deploy from GitHub repo**
+3. Select **Whizkevina/cardcraft** (or your fork)
+4. Railway reads `railway.toml` automatically — no manual config needed
+5. Go to your service → **Variables** tab and add:
+
+| Variable | Value |
+|---|---|
+| `PAYSTACK_SECRET_KEY` | `sk_live_xxxx` from Paystack dashboard |
+| `PAYSTACK_PUBLIC_KEY` | `pk_live_xxxx` from Paystack dashboard |
+| `GMAIL_USER` | Your Gmail address |
+| `GMAIL_APP_PASSWORD` | Gmail App Password (16-char code) |
+| `SESSION_SECRET` | Any long random string |
+| `APP_URL` | Your Railway URL e.g. `https://cardcraft.railway.app` |
+
+6. Click **Deploy** — Railway builds and starts the app in ~2 minutes
+7. Your app is live at `https://cardcraft-production-xxxx.up.railway.app`
+
+**Persistent storage note:** The SQLite database (`cardcraft.db`) is stored on the Railway volume. To add a persistent volume: service → **Add Volume** → mount path `/app` (or wherever your app runs).
+
+> Free tier includes $5/month credit — enough for a low-traffic app.
 
 ---
 
