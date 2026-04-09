@@ -7,7 +7,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
-import { Sun, Moon, User, LogOut, FolderOpen, Shield, Layers, Sparkles } from "lucide-react";
+import { Sun, Moon, User, LogOut, FolderOpen, Shield, Layers, Sparkles, Settings, CreditCard } from "lucide-react";
 
 export default function Navbar() {
   const { user, isPro, isAdmin, logout } = useAuth();
@@ -106,6 +106,16 @@ export default function Navbar() {
                 <DropdownMenuItem asChild>
                   <Link href="/bulk">
                     <a className="flex items-center gap-2 w-full cursor-pointer"><Layers size={14} /> Bulk Generate</a>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/payments">
+                    <a className="flex items-center gap-2 w-full cursor-pointer"><CreditCard size={14} /> Payments</a>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/settings">
+                    <a className="flex items-center gap-2 w-full cursor-pointer"><Settings size={14} /> Account Settings</a>
                   </Link>
                 </DropdownMenuItem>
                 {isAdmin && (

@@ -118,7 +118,16 @@ export default function AuthPage() {
             </button>
           </p>
 
-          <div className="mt-6 pt-4 border-t border-border">
+          {mode === "login" && (
+            <div className="pt-2">
+              <Link href="/forgot-password">
+                <a className="text-xs text-muted-foreground hover:text-primary transition-colors block text-center">
+                  Forgot your password?
+                </a>
+              </Link>
+            </div>
+          )}
+          <div className="mt-4 pt-4 border-t border-border">
             <Link href="/templates">
               <a className="text-xs text-muted-foreground hover:text-foreground text-center block">
                 ← Continue without account (guest mode)

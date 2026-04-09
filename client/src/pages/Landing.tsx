@@ -211,9 +211,11 @@ export default function Landing() {
             <Link href="/pricing"><a className="hover:text-foreground transition-colors">Pricing</a></Link>
             <Link href="/auth"><a className="hover:text-foreground transition-colors">Sign In</a></Link>
           </nav>
-          <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} CardCraft. All rights reserved.
-          </p>
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <Link href="/terms"><a className="hover:text-foreground transition-colors">Terms</a></Link>
+            <Link href="/privacy"><a className="hover:text-foreground transition-colors">Privacy</a></Link>
+            <span>&copy; {new Date().getFullYear()} CardCraft</span>
+          </div>
         </div>
       </footer>
     </div>

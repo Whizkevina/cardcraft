@@ -1,10 +1,11 @@
-import type { Express, Request } from "express";
+import type { Express } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
 import bcrypt from "bcryptjs";
 import session from "express-session";
 import nodemailer from "nodemailer";
 import https from "https";
+import crypto from "crypto";
 import { FREE_DOWNLOAD_LIMIT, PRO_PRICE_KOBO, PRO_PRICE_NGN } from "@shared/schema";
 
 declare module "express-session" {
@@ -15,41 +16,25 @@ declare module "express-session" {
   }
 }
 
-// ─── Paystack config (swap with real keys in production) ──────────────────────
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY || "sk_test_placeholder_replace_with_real_key";
 const PAYSTACK_PUBLIC = process.env.PAYSTACK_PUBLIC_KEY || "pk_test_placeholder_replace_with_real_key";
 
-// ─── Nodemailer transporter (Gmail SMTP) ─────────────────────────────────────
 const createTransporter = () => nodemailer.createTransport({
   service: "gmail",
-  auth: {
-    user: process.env.GMAIL_USER || "",
-    pass: process.env.GMAIL_APP_PASSWORD || "",
-  },
+  auth: { user: process.env.GMAIL_USER || "", pass: process.env.GMAIL_APP_PASSWORD || "" },
 });
 
-// ─── Paystack HTTP helpers ────────────────────────────────────────────────────
 function paystackRequest(method: string, path: string, body?: object): Promise<any> {
   return new Promise((resolve, reject) => {
     const data = body ? JSON.stringify(body) : undefined;
-    const options = {
-      hostname: "api.paystack.co",
-      port: 443,
-      path,
-      method,
-      headers: {
-        Authorization: `Bearer ${PAYSTACK_SECRET}`,
-        "Content-Type": "application/json",
-        ...(data && { "Content-Length": Buffer.byteLength(data) }),
-      },
+    const opts = {
+      hostname: "api.paystack.co", port: 443, path, method,
+      headers: { Authorization: `Bearer ${PAYSTACK_SECRET}`, "Content-Type": "application/json", ...(data && { "Content-Length": Buffer.byteLength(data) }) },
     };
-    const req = https.request(options, res => {
+    const req = https.request(opts, res => {
       let raw = "";
-      res.on("data", chunk => { raw += chunk; });
-      res.on("end", () => {
-        try { resolve(JSON.parse(raw)); }
-        catch { reject(new Error("Invalid Paystack response")); }
-      });
+      res.on("data", c => { raw += c; });
+      res.on("end", () => { try { resolve(JSON.parse(raw)); } catch { reject(new Error("Invalid Paystack response")); } });
     });
     req.on("error", reject);
     if (data) req.write(data);
@@ -57,22 +42,19 @@ function paystackRequest(method: string, path: string, body?: object): Promise<a
   });
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 const safeUser = (u: any) => ({
   id: u.id, name: u.name, email: u.email, role: u.role,
-  tier: u.tier || "free", downloadsToday: u.downloadsToday || 0,
-  lastDownloadDate: u.lastDownloadDate,
+  tier: u.tier || "free", theme: u.theme || "dark",
+  downloadsToday: u.downloadsToday || 0, lastDownloadDate: u.lastDownloadDate,
 });
 
-function generateRef() {
-  return `CC-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-}
+function generateRef() { return `CC-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`; }
+function generateToken() { return crypto.randomBytes(32).toString("hex"); }
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
   app.use(session({
     secret: process.env.SESSION_SECRET || "cardcraft-secret-2024",
-    resave: false,
-    saveUninitialized: false,
+    resave: false, saveUninitialized: false,
     cookie: { secure: false, maxAge: 7 * 24 * 60 * 60 * 1000 }
   }));
 
@@ -84,9 +66,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (storage.getUserByEmail(email)) return res.status(400).json({ error: "Email already registered" });
       const hashed = await bcrypt.hash(password, 10);
       const user = storage.createUser({ name, email, password: hashed, role: "user", tier: "free" });
-      req.session.userId = user.id;
-      req.session.userRole = user.role;
-      req.session.userTier = user.tier;
+      req.session.userId = user.id; req.session.userRole = user.role; req.session.userTier = user.tier;
       res.json(safeUser(user));
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
@@ -96,18 +76,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const { email, password } = req.body;
       if (!email || !password) return res.status(400).json({ error: "Email and password required" });
       const user = storage.getUserByEmail(email);
-      if (!user) return res.status(401).json({ error: "Invalid credentials" });
-      if (!await bcrypt.compare(password, user.password)) return res.status(401).json({ error: "Invalid credentials" });
-      req.session.userId = user.id;
-      req.session.userRole = user.role;
-      req.session.userTier = user.tier;
+      if (!user || !await bcrypt.compare(password, user.password)) return res.status(401).json({ error: "Invalid credentials" });
+      req.session.userId = user.id; req.session.userRole = user.role; req.session.userTier = user.tier;
       res.json(safeUser(user));
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
-  app.post("/api/auth/logout", (req, res) => {
-    req.session.destroy(() => res.json({ ok: true }));
-  });
+  app.post("/api/auth/logout", (req, res) => { req.session.destroy(() => res.json({ ok: true })); });
 
   app.get("/api/auth/me", (req, res) => {
     if (!req.session.userId) return res.json({ user: null });
@@ -115,6 +90,79 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (!user) return res.json({ user: null });
     req.session.userTier = user.tier;
     res.json({ user: safeUser(user) });
+  });
+
+  // ─── Change password ──────────────────────────────────────────────────────
+  app.post("/api/auth/change-password", async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ error: "Unauthorized" });
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) return res.status(400).json({ error: "Both fields required" });
+    if (newPassword.length < 6) return res.status(400).json({ error: "Password must be at least 6 characters" });
+    const user = storage.getUser(req.session.userId);
+    if (!user || !await bcrypt.compare(currentPassword, user.password)) return res.status(401).json({ error: "Current password is incorrect" });
+    const hashed = await bcrypt.hash(newPassword, 10);
+    storage.updateUserPassword(req.session.userId, hashed);
+    res.json({ ok: true });
+  });
+
+  // ─── Forgot password ──────────────────────────────────────────────────────
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: "Email required" });
+    const token = generateToken();
+    const expiry = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour
+    const found = storage.setResetToken(email, token, expiry);
+
+    // Always return 200 so we don't leak whether an email exists
+    if (found) {
+      const gmailUser = process.env.GMAIL_USER;
+      const gmailPass = process.env.GMAIL_APP_PASSWORD;
+      if (gmailUser && gmailPass) {
+        const appUrl = process.env.APP_URL || "http://localhost:5000";
+        const resetUrl = `${appUrl}/#/reset-password?token=${token}`;
+        try {
+          const transporter = createTransporter();
+          await transporter.sendMail({
+            from: `"CardCraft" <${gmailUser}>`, to: email,
+            subject: "Reset your CardCraft password",
+            html: `
+              <div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;background:#f9f9f7;padding:32px;border-radius:12px;">
+                <h2 style="color:#1a1a1a">Reset your password</h2>
+                <p style="color:#555">You requested a password reset for your CardCraft account. Click the button below to set a new password.</p>
+                <a href="${resetUrl}" style="display:inline-block;background:#c9a84c;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;margin:16px 0;">Reset Password</a>
+                <p style="color:#999;font-size:12px;">This link expires in 1 hour. If you didn't request this, ignore this email.</p>
+              </div>`,
+          });
+        } catch (e) { /* silently fail */ }
+      }
+    }
+    res.json({ ok: true, message: "If that email is registered, you'll receive a reset link shortly." });
+  });
+
+  // ─── Reset password ───────────────────────────────────────────────────────
+  app.post("/api/auth/reset-password", async (req, res) => {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) return res.status(400).json({ error: "Token and new password required" });
+    if (newPassword.length < 6) return res.status(400).json({ error: "Password must be at least 6 characters" });
+    const user = storage.getUserByResetToken(token);
+    if (!user) return res.status(400).json({ error: "Invalid or expired reset link" });
+    if (user.resetTokenExpiry && new Date(user.resetTokenExpiry) < new Date()) {
+      storage.clearResetToken(user.id);
+      return res.status(400).json({ error: "Reset link has expired. Please request a new one." });
+    }
+    const hashed = await bcrypt.hash(newPassword, 10);
+    storage.updateUserPassword(user.id, hashed);
+    storage.clearResetToken(user.id);
+    res.json({ ok: true, message: "Password updated successfully. You can now sign in." });
+  });
+
+  // ─── Theme preference ─────────────────────────────────────────────────────
+  app.patch("/api/auth/theme", (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ error: "Unauthorized" });
+    const { theme } = req.body;
+    if (!["dark", "light"].includes(theme)) return res.status(400).json({ error: "Invalid theme" });
+    const user = storage.updateUserTheme(req.session.userId, theme);
+    res.json({ theme: user?.theme || theme });
   });
 
   // ─── Download tracking ────────────────────────────────────────────────────
@@ -137,13 +185,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // ─── Templates ────────────────────────────────────────────────────────────
   app.get("/api/templates", (req, res) => {
     const isAdmin = req.session.userRole === "admin";
-    const templates = isAdmin ? storage.getAllTemplates() : storage.getPublishedTemplates();
-    res.json(templates);
+    res.json(isAdmin ? storage.getAllTemplates() : storage.getPublishedTemplates());
   });
 
   app.get("/api/templates/:id", (req, res) => {
     const t = storage.getTemplate(Number(req.params.id));
     if (!t) return res.status(404).json({ error: "Not found" });
+    // Track usage
+    if (req.session.userId) storage.incrementTemplateUsage(t.id);
     res.json(t);
   });
 
@@ -202,88 +251,65 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json({ ok: true });
   });
 
-  // ─── Paystack: Initialize payment ─────────────────────────────────────────
+  app.post("/api/projects/:id/duplicate", (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ error: "Unauthorized" });
+    const copy = storage.duplicateProject(Number(req.params.id), req.session.userId);
+    if (!copy) return res.status(404).json({ error: "Not found or unauthorized" });
+    res.json(copy);
+  });
+
+  app.patch("/api/projects/:id/rename", (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ error: "Unauthorized" });
+    const { title } = req.body;
+    if (!title?.trim()) return res.status(400).json({ error: "Title required" });
+    const p = storage.renameProject(Number(req.params.id), req.session.userId, title.trim());
+    if (!p) return res.status(404).json({ error: "Not found" });
+    res.json(p);
+  });
+
+  // ─── Paystack ────────────────────────────────────────────────────────────
   app.post("/api/payments/initialize", async (req, res) => {
     if (!req.session.userId) return res.status(401).json({ error: "Sign in to upgrade" });
     const user = storage.getUser(req.session.userId);
     if (!user) return res.status(404).json({ error: "User not found" });
     if (user.tier === "pro") return res.status(400).json({ error: "Already on Pro plan" });
-
     try {
       const reference = generateRef();
-      // Create pending payment record
-      storage.createPayment({
-        userId: user.id,
-        reference,
-        amount: PRO_PRICE_KOBO,
-        status: "pending",
-        plan: "pro_lifetime",
-      });
-
-      // Initialize with Paystack
+      storage.createPayment({ userId: user.id, reference, amount: PRO_PRICE_KOBO, status: "pending", plan: "pro_lifetime" });
       const paystackRes = await paystackRequest("POST", "/transaction/initialize", {
-        email: user.email,
-        amount: PRO_PRICE_KOBO,
-        reference,
-        currency: "NGN",
-        metadata: {
-          userId: user.id,
-          plan: "pro_lifetime",
-          custom_fields: [
-            { display_name: "Plan", variable_name: "plan", value: "CardCraft Pro — Lifetime" },
-            { display_name: "User", variable_name: "user", value: user.name },
-          ],
-        },
-        callback_url: `${process.env.APP_URL || "https://cardcraft.app"}/api/payments/callback`,
+        email: user.email, amount: PRO_PRICE_KOBO, reference, currency: "NGN",
+        metadata: { userId: user.id, plan: "pro_lifetime" },
+        callback_url: `${process.env.APP_URL || "http://localhost:5000"}/#/pricing`,
       });
-
-      if (!paystackRes.status) {
-        return res.status(500).json({ error: paystackRes.message || "Paystack initialization failed" });
-      }
-
-      res.json({
-        reference,
-        authorizationUrl: paystackRes.data.authorization_url,
-        accessCode: paystackRes.data.access_code,
-        publicKey: PAYSTACK_PUBLIC,
-        amount: PRO_PRICE_NGN,
-        email: user.email,
-      });
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
-    }
+      if (!paystackRes.status) return res.status(500).json({ error: paystackRes.message || "Paystack error" });
+      res.json({ reference, authorizationUrl: paystackRes.data.authorization_url, accessCode: paystackRes.data.access_code, publicKey: PAYSTACK_PUBLIC, amount: PRO_PRICE_NGN, email: user.email });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
-  // ─── Paystack: Verify payment ─────────────────────────────────────────────
-  app.get("/api/payments/verify/:reference", async (req, res) => {
-    const { reference } = req.params;
+  app.post("/api/payments/confirm", async (req, res) => {
+    const { reference } = req.body;
+    if (!reference) return res.status(400).json({ error: "Reference required" });
     try {
       const paystackRes = await paystackRequest("GET", `/transaction/verify/${reference}`);
       const payment = storage.getPayment(reference);
-
       if (!payment) return res.status(404).json({ error: "Payment not found" });
-
       if (paystackRes.status && paystackRes.data.status === "success") {
-        // Mark payment success
         storage.updatePaymentStatus(reference, "success", JSON.stringify(paystackRes.data));
-        // Upgrade user to Pro
         storage.updateUserTier(payment.userId, "pro");
-        // Update session if this is the paying user
         if (req.session.userId === payment.userId) req.session.userTier = "pro";
-
-        return res.json({ success: true, message: "Payment verified. Your account has been upgraded to Pro!", tier: "pro" });
-      } else {
-        storage.updatePaymentStatus(reference, "failed", JSON.stringify(paystackRes.data));
-        return res.json({ success: false, message: paystackRes.data?.gateway_response || "Payment was not successful" });
+        return res.json({ success: true, tier: "pro" });
       }
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
-    }
+      res.json({ success: false, message: "Payment not complete yet" });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
-  // ─── Paystack: Webhook (server-to-server notification) ────────────────────
   app.post("/api/payments/webhook", (req, res) => {
-    // In production: verify HMAC signature with PAYSTACK_SECRET
+    // Verify Paystack HMAC signature
+    const secret = process.env.PAYSTACK_SECRET_KEY;
+    if (secret) {
+      const hash = crypto.createHmac("sha512", secret).update(JSON.stringify(req.body)).digest("hex");
+      if (hash !== req.headers["x-paystack-signature"]) return res.status(400).json({ error: "Invalid signature" });
+    }
     const event = req.body;
     if (event.event === "charge.success") {
       const ref = event.data?.reference;
@@ -298,87 +324,46 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.sendStatus(200);
   });
 
-  // ─── Paystack: Inline popup (frontend calls this after popup closes) ───────
-  app.post("/api/payments/confirm", async (req, res) => {
-    const { reference } = req.body;
-    if (!reference) return res.status(400).json({ error: "Reference required" });
-    try {
-      const paystackRes = await paystackRequest("GET", `/transaction/verify/${reference}`);
-      const payment = storage.getPayment(reference);
-      if (!payment) return res.status(404).json({ error: "Payment not found" });
-
-      if (paystackRes.status && paystackRes.data.status === "success") {
-        storage.updatePaymentStatus(reference, "success", JSON.stringify(paystackRes.data));
-        storage.updateUserTier(payment.userId, "pro");
-        if (req.session.userId === payment.userId) req.session.userTier = "pro";
-        return res.json({ success: true, tier: "pro" });
-      }
-      res.json({ success: false, message: "Payment not complete yet" });
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
-    }
+  // ─── Payment history ──────────────────────────────────────────────────────
+  app.get("/api/payments/my", (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ error: "Unauthorized" });
+    res.json(storage.getPaymentsByUser(req.session.userId));
   });
 
-  // ─── Email: Send card ─────────────────────────────────────────────────────
+  // ─── Email ───────────────────────────────────────────────────────────────
   app.post("/api/email/send-card", async (req, res) => {
     const { to, subject, message, imageDataUrl, cardTitle } = req.body;
-    if (!to || !imageDataUrl) return res.status(400).json({ error: "Recipient email and card image are required" });
-
-    // Email validation
+    if (!to || !imageDataUrl) return res.status(400).json({ error: "Recipient email and image required" });
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return res.status(400).json({ error: "Invalid email address" });
-
-    // Check if Gmail is configured
     const gmailUser = process.env.GMAIL_USER;
     const gmailPass = process.env.GMAIL_APP_PASSWORD;
-    if (!gmailUser || !gmailPass) {
-      return res.status(503).json({
-        error: "Email not configured",
-        hint: "Set GMAIL_USER and GMAIL_APP_PASSWORD environment variables to enable email sending."
-      });
-    }
-
+    if (!gmailUser || !gmailPass) return res.status(503).json({ error: "Email not configured", hint: "Set GMAIL_USER and GMAIL_APP_PASSWORD environment variables." });
     try {
-      // Convert base64 data URL to buffer
       const base64Data = imageDataUrl.replace(/^data:image\/\w+;base64,/, "");
       const imageBuffer = Buffer.from(base64Data, "base64");
       const isJpeg = imageDataUrl.startsWith("data:image/jpeg");
       const filename = `${(cardTitle || "card").replace(/\s+/g, "-")}.${isJpeg ? "jpg" : "png"}`;
-
       const transporter = createTransporter();
       await transporter.sendMail({
-        from: `"CardCraft" <${gmailUser}>`,
-        to,
+        from: `"CardCraft" <${gmailUser}>`, to,
         subject: subject || `${cardTitle || "Your Card"} from CardCraft`,
-        html: `
-          <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f9f9f7;padding:32px;border-radius:12px;">
-            <h2 style="color:#1a1a1a;margin-bottom:8px;">You received a card!</h2>
-            <p style="color:#666;margin-bottom:24px;">${message || "Someone designed this card for you using CardCraft."}</p>
-            <img src="cid:cardimage" alt="${cardTitle || "Birthday Card"}" style="width:100%;max-width:500px;border-radius:12px;display:block;margin:0 auto 24px;" />
-            <p style="color:#999;font-size:12px;text-align:center;">Created with <a href="https://cardcraft.app" style="color:#c9a84c;">CardCraft</a> — Design beautiful cards online</p>
-          </div>
-        `,
-        attachments: [{
-          filename,
-          content: imageBuffer,
-          cid: "cardimage",
-        }],
+        html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f9f9f7;padding:32px;border-radius:12px;"><h2 style="color:#1a1a1a;">You received a card!</h2><p style="color:#666;">${message || "Someone designed this card for you using CardCraft."}</p><img src="cid:cardimage" alt="${cardTitle || "Card"}" style="width:100%;max-width:500px;border-radius:12px;display:block;margin:16px auto;" /><p style="color:#999;font-size:12px;text-align:center;">Created with <a href="https://cardcraft.app" style="color:#c9a84c;">CardCraft</a></p></div>`,
+        attachments: [{ filename, content: imageBuffer, cid: "cardimage" }],
       });
-
       res.json({ success: true, message: `Card sent to ${to}` });
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
-    }
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
-  // ─── Email config status ──────────────────────────────────────────────────
   app.get("/api/email/status", (req, res) => {
-    res.json({
-      configured: !!(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD),
-      sender: process.env.GMAIL_USER || null,
-    });
+    res.json({ configured: !!(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD), sender: process.env.GMAIL_USER || null });
   });
 
-  // ─── Admin: User Management ───────────────────────────────────────────────
+  // ─── Admin ───────────────────────────────────────────────────────────────
+  app.get("/api/admin/analytics", (req, res) => {
+    if (req.session.userRole !== "admin") return res.status(403).json({ error: "Forbidden" });
+    res.json(storage.getAnalytics());
+  });
+
   app.get("/api/admin/users", (req, res) => {
     if (req.session.userRole !== "admin") return res.status(403).json({ error: "Forbidden" });
     res.json(storage.getAllUsers().map(safeUser));

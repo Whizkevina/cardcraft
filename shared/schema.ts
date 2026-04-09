@@ -10,8 +10,11 @@ export const users = sqliteTable("users", {
   password: text("password").notNull(),
   role: text("role", { enum: ["guest", "user", "admin"] }).notNull().default("user"),
   tier: text("tier", { enum: ["free", "pro"] }).notNull().default("free"),
+  theme: text("theme", { enum: ["dark", "light"] }).notNull().default("dark"),
   downloadsToday: integer("downloads_today").notNull().default(0),
   lastDownloadDate: text("last_download_date"),
+  resetToken: text("reset_token"),
+  resetTokenExpiry: text("reset_token_expiry"),
   createdAt: text("created_at").notNull().default(new Date().toISOString()),
 });
 
@@ -29,6 +32,7 @@ export const templates = sqliteTable("templates", {
   canvasJson: text("canvas_json").notNull(),
   thumbnailColor: text("thumbnail_color").notNull().default("#8B5CF6"),
   isPro: integer("is_pro", { mode: "boolean" }).notNull().default(false),
+  usageCount: integer("usage_count").notNull().default(0),
   createdAt: text("created_at").notNull().default(new Date().toISOString()),
 });
 
@@ -58,11 +62,11 @@ export const payments = sqliteTable("payments", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: integer("user_id").notNull(),
   reference: text("reference").notNull().unique(),
-  amount: integer("amount").notNull(),          // in kobo (NGN × 100)
+  amount: integer("amount").notNull(),
   currency: text("currency").notNull().default("NGN"),
   status: text("status", { enum: ["pending", "success", "failed"] }).notNull().default("pending"),
   plan: text("plan").notNull().default("pro_lifetime"),
-  paystackData: text("paystack_data"),          // raw JSON from Paystack
+  paystackData: text("paystack_data"),
   createdAt: text("created_at").notNull().default(new Date().toISOString()),
 });
 
@@ -72,5 +76,5 @@ export type Payment = typeof payments.$inferSelect;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 export const FREE_DOWNLOAD_LIMIT = 3;
-export const PRO_PRICE_KOBO = 1000000;   // ₦10,000 in kobo
-export const PRO_PRICE_NGN  = 10000;     // ₦10,000
+export const PRO_PRICE_KOBO = 1000000;
+export const PRO_PRICE_NGN  = 10000;

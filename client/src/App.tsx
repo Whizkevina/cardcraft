@@ -14,6 +14,10 @@ import AuthPage from "./pages/AuthPage";
 import AdminPage from "./pages/AdminPage";
 import BulkGenerate from "./pages/BulkGenerate";
 import PricingPage from "./pages/PricingPage";
+import PaymentsPage from "./pages/PaymentsPage";
+import AccountSettings from "./pages/AccountSettings";
+import ForgotPassword from "./pages/ForgotPassword";
+import LegalPage from "./pages/LegalPage";
 import NotFound from "./pages/not-found";
 
 export default function App() {
@@ -31,6 +35,12 @@ export default function App() {
               <Route path="/projects" component={Projects} />
               <Route path="/bulk" component={BulkGenerate} />
               <Route path="/pricing" component={PricingPage} />
+              <Route path="/payments" component={PaymentsPage} />
+              <Route path="/settings" component={AccountSettings} />
+              <Route path="/forgot-password" component={ForgotPassword} />
+              <Route path="/reset-password" component={ForgotPassword} />
+              <Route path="/terms" component={LegalPage} />
+              <Route path="/privacy" component={LegalPage} />
               <Route path="/auth" component={AuthPage} />
               <Route path="/admin" component={AdminPage} />
               <Route component={NotFound} />

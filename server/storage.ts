@@ -16,8 +16,11 @@ sqlite.exec(`
     password TEXT NOT NULL,
     role TEXT NOT NULL DEFAULT 'user',
     tier TEXT NOT NULL DEFAULT 'free',
+    theme TEXT NOT NULL DEFAULT 'dark',
     downloads_today INTEGER NOT NULL DEFAULT 0,
     last_download_date TEXT,
+    reset_token TEXT,
+    reset_token_expiry TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -30,6 +33,7 @@ sqlite.exec(`
     canvas_json TEXT NOT NULL,
     thumbnail_color TEXT NOT NULL DEFAULT '#8B5CF6',
     is_pro INTEGER NOT NULL DEFAULT 0,
+    usage_count INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -66,6 +70,10 @@ try { sqlite.exec("ALTER TABLE users ADD COLUMN tier TEXT NOT NULL DEFAULT 'free
 try { sqlite.exec("ALTER TABLE users ADD COLUMN downloads_today INTEGER NOT NULL DEFAULT 0"); } catch {}
 try { sqlite.exec("ALTER TABLE users ADD COLUMN last_download_date TEXT"); } catch {}
 try { sqlite.exec("ALTER TABLE templates ADD COLUMN is_pro INTEGER NOT NULL DEFAULT 0"); } catch {}
+try { sqlite.exec("ALTER TABLE templates ADD COLUMN usage_count INTEGER NOT NULL DEFAULT 0"); } catch {}
+try { sqlite.exec("ALTER TABLE users ADD COLUMN theme TEXT NOT NULL DEFAULT 'dark'"); } catch {}
+try { sqlite.exec("ALTER TABLE users ADD COLUMN reset_token TEXT"); } catch {}
+try { sqlite.exec("ALTER TABLE users ADD COLUMN reset_token_expiry TEXT"); } catch {}
 
 export interface IStorage {
   // Users
@@ -75,7 +83,14 @@ export interface IStorage {
   getAllUsers(): User[];
   updateUserTier(id: number, tier: "free" | "pro"): User | undefined;
   updateUserRole(id: number, role: "user" | "admin"): User | undefined;
+  updateUserPassword(id: number, hashedPassword: string): User | undefined;
+  updateUserTheme(id: number, theme: "dark" | "light"): User | undefined;
+  setResetToken(email: string, token: string, expiry: string): boolean;
+  getUserByResetToken(token: string): User | undefined;
+  clearResetToken(id: number): void;
   trackDownload(userId: number): { allowed: boolean; downloadsToday: number };
+  // Analytics
+  getAnalytics(): { totalUsers: number; proUsers: number; totalCards: number; totalRevenue: number; cardsToday: number; signupsToday: number; topTemplates: any[]; recentSignups: any[] };
   // Templates
   getAllTemplates(): Template[];
   getPublishedTemplates(): Template[];
@@ -135,6 +150,60 @@ export class Storage implements IStorage {
     
     return { allowed: true, downloadsToday: newCount };
   }
+  updateUserPassword(id: number, hashedPassword: string): User | undefined {
+    return db.update(schema.users).set({ password: hashedPassword }).where(eq(schema.users.id, id)).returning().get();
+  }
+  updateUserTheme(id: number, theme: "dark" | "light"): User | undefined {
+    return db.update(schema.users).set({ theme }).where(eq(schema.users.id, id)).returning().get();
+  }
+  setResetToken(email: string, token: string, expiry: string): boolean {
+    const user = this.getUserByEmail(email);
+    if (!user) return false;
+    db.update(schema.users).set({ resetToken: token, resetTokenExpiry: expiry }).where(eq(schema.users.id, user.id)).run();
+    return true;
+  }
+  getUserByResetToken(token: string): User | undefined {
+    return db.select().from(schema.users).where(eq(schema.users.resetToken, token)).get();
+  }
+  clearResetToken(id: number): void {
+    db.update(schema.users).set({ resetToken: null, resetTokenExpiry: null }).where(eq(schema.users.id, id)).run();
+  }
+  getAnalytics(): { totalUsers: number; proUsers: number; totalCards: number; totalRevenue: number; cardsToday: number; signupsToday: number; topTemplates: any[]; recentSignups: any[] } {
+    const today = new Date().toISOString().split("T")[0];
+    const allUsers = db.select().from(schema.users).all();
+    const allProjects = db.select().from(schema.projects).all();
+    const allPayments = db.select().from(schema.payments).all();
+    const allTemplates = db.select().from(schema.templates).all();
+
+    const totalRevenue = allPayments.filter(p => p.status === "success").reduce((sum, p) => sum + (p.amount / 100), 0);
+    const cardsToday = allProjects.filter(p => p.createdAt?.startsWith(today)).length;
+    const signupsToday = allUsers.filter(u => u.createdAt?.startsWith(today)).length;
+
+    // Top templates by usage
+    const usageMap: Record<number, number> = {};
+    allProjects.forEach(p => { if (p.templateId) usageMap[p.templateId] = (usageMap[p.templateId] || 0) + 1; });
+    const topTemplates = allTemplates
+      .map(t => ({ ...t, uses: usageMap[t.id] || 0 }))
+      .sort((a, b) => b.uses - a.uses)
+      .slice(0, 5);
+
+    // Recent signups
+    const recentSignups = [...allUsers]
+      .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))
+      .slice(0, 8)
+      .map(u => ({ id: u.id, name: u.name, email: u.email, tier: u.tier, createdAt: u.createdAt }));
+
+    return {
+      totalUsers: allUsers.length,
+      proUsers: allUsers.filter(u => u.tier === "pro").length,
+      totalCards: allProjects.length,
+      totalRevenue,
+      cardsToday,
+      signupsToday,
+      topTemplates,
+      recentSignups,
+    };
+  }
   getAllTemplates(): Template[] {
     return db.select().from(schema.templates).orderBy(desc(schema.templates.id)).all();
   }
@@ -166,6 +235,26 @@ export class Storage implements IStorage {
   updatePaymentStatus(reference: string, status: "success" | "failed", paystackData?: string): Payment | undefined {
     return db.update(schema.payments).set({ status, ...(paystackData && { paystackData }) })
       .where(eq(schema.payments.reference, reference)).returning().get();
+  }
+  incrementTemplateUsage(templateId: number): void {
+    db.update(schema.templates).set({ usageCount: (db.select().from(schema.templates).where(eq(schema.templates.id, templateId)).get()?.usageCount || 0) + 1 }).where(eq(schema.templates.id, templateId)).run();
+  }
+  duplicateProject(id: number, userId: number): Project | undefined {
+    const original = this.getProject(id);
+    if (!original || original.userId !== userId) return undefined;
+    return this.createProject({
+      userId,
+      templateId: original.templateId,
+      title: original.title + " (Copy)",
+      designJson: original.designJson,
+      exportSettings: original.exportSettings,
+      thumbnail: original.thumbnail,
+    });
+  }
+  renameProject(id: number, userId: number, title: string): Project | undefined {
+    const existing = this.getProject(id);
+    if (!existing || existing.userId !== userId) return undefined;
+    return this.updateProject(id, { title });
   }
   getProjectsByUser(userId: number): Project[] {
     return db.select().from(schema.projects).where(eq(schema.projects.userId, userId)).orderBy(desc(schema.projects.updatedAt)).all();
