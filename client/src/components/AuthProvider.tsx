@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -80,8 +81,34 @@ function ForcePasswordDialog({ onDone }: { onDone: () => void }) {
   );
 }
 
+// ─── Pending design auto-save ─────────────────────────────────────────────────
+// After login/register, if a design was saved to sessionStorage before auth,
+// POST it as a new project then redirect the user into the editor.
+async function flushPendingDesign(userId: number, navigate: (to: string) => void) {
+  try {
+    const raw = sessionStorage.getItem("pendingDesign");
+    if (!raw) return;
+    sessionStorage.removeItem("pendingDesign");
+    const pending = JSON.parse(raw) as { title: string; designJson: string; templateId?: number | null };
+    const res = await apiRequest("POST", "/api/projects", {
+      title: pending.title || "Untitled Card",
+      designJson: pending.designJson,
+      templateId: pending.templateId ?? null,
+    });
+    if (res.ok) {
+      const project = await res.json();
+      navigate(`/editor/project/${project.id}`);
+    } else {
+      navigate("/projects");
+    }
+  } catch {
+    navigate("/projects");
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient();
+  const [, navigate] = useLocation();
   const [needsPwChange, setNeedsPwChange] = useState(false);
 
   const { data, isLoading } = useQuery({
@@ -91,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return res.json();
     },
     staleTime: 30000,
-    refetchInterval: 60000, // Refresh every minute so tier changes propagate
+    refetchInterval: 60000,
   });
 
   const loginMutation = useMutation({
@@ -100,9 +127,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: async (data: any) => {
       if (data?.needsPasswordChange) setNeedsPwChange(true);
-      qc.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      // Hard refetch (not just invalidate) so navbar updates immediately
+      await qc.refetchQueries({ queryKey: ["/api/auth/me"] });
+      await flushPendingDesign(data?.id, navigate);
     },
   });
 
@@ -112,12 +141,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
       return res.json();
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/auth/me"] }),
+    onSuccess: async (data: any) => {
+      // Hard refetch so navbar shows user immediately
+      await qc.refetchQueries({ queryKey: ["/api/auth/me"] });
+      await flushPendingDesign(data?.id, navigate);
+    },
   });
 
   const logoutMutation = useMutation({
     mutationFn: async () => { await apiRequest("POST", "/api/auth/logout"); },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/auth/me"] }),
+    onSuccess: () => qc.refetchQueries({ queryKey: ["/api/auth/me"] }),
   });
 
   const user: AuthUser | null = data?.user ?? null;
