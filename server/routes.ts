@@ -87,6 +87,51 @@ const createTransporter = () =>
     auth: { user: process.env.GMAIL_USER || "", pass: process.env.GMAIL_APP_PASSWORD || "" },
   });
 
+// ─── Welcome email ────────────────────────────────────────────────────────────
+async function sendWelcomeEmail(name: string, email: string) {
+  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) return;
+  const appUrl = process.env.APP_URL || "https://cardcraft-tdog.onrender.com";
+  const safeName = escapeHtml(name);
+  try {
+    await createTransporter().sendMail({
+      from: `"CardCraft" <${process.env.GMAIL_USER}>`,
+      to: email,
+      subject: "Welcome to CardCraft! 🎨",
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;background:#16151a;padding:36px;border-radius:14px;color:#e8e0cc;">
+          <div style="text-align:center;margin-bottom:24px;">
+            <svg viewBox="0 0 32 32" fill="none" width="48" height="48" style="display:inline-block;">
+              <rect width="32" height="32" rx="8" fill="hsl(43,96%,58%)"/>
+              <rect x="6" y="8" width="20" height="16" rx="3" fill="none" stroke="#16151a" stroke-width="2"/>
+              <path d="M6 14h20" stroke="#16151a" stroke-width="1.5"/>
+              <circle cx="10" cy="20" r="1.5" fill="#16151a"/>
+              <path d="M13 20h9" stroke="#16151a" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <h1 style="color:#f0c040;font-size:22px;margin:12px 0 4px;">Welcome to CardCraft!</h1>
+          </div>
+          <p style="color:#c8bfa8;font-size:15px;line-height:1.6;">Hi <strong style="color:#f0e0a0;">${safeName}</strong>,</p>
+          <p style="color:#c8bfa8;font-size:15px;line-height:1.6;">
+            Your account is ready. You can now create, save, and share stunning cards — business cards, invites, event flyers, and more.
+          </p>
+          <div style="text-align:center;margin:28px 0;">
+            <a href="${appUrl}/#/templates"
+               style="display:inline-block;background:#c9a84c;color:#16151a;padding:13px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;letter-spacing:0.3px;">
+              Start Designing →
+            </a>
+          </div>
+          <p style="color:#7a7060;font-size:12px;text-align:center;margin-top:24px;">
+            You're on the <strong>Free plan</strong> — upgrade to Pro anytime for unlimited downloads.<br/>
+            <a href="${appUrl}/#/pricing" style="color:#c9a84c;">View Pro plans</a>
+          </p>
+        </div>
+      `,
+    });
+  } catch (e) {
+    // Fail silently — welcome email is non-critical
+    console.error("[welcome-email] Failed to send:", e);
+  }
+}
+
 // ─── Paystack HTTP helper ─────────────────────────────────────────────────────
 function paystackRequest(method: string, path: string, body?: object): Promise<any> {
   return new Promise((resolve, reject) => {
@@ -190,11 +235,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (typeof name !== "string" || name.trim().length > 100) return res.status(400).json({ error: "Name too long" });
       const normalEmail = validator.normalizeEmail(email) || email.toLowerCase().trim();
       if (storage.getUserByEmail(normalEmail)) return res.status(400).json({ error: "Email already registered" });
-      const hashed = await bcrypt.hash(password, 12); // bcrypt rounds increased to 12
+      const hashed = await bcrypt.hash(password, 12);
       const user = storage.createUser({ name: name.trim(), email: normalEmail, password: hashed, role: "user", tier: "free" });
       req.session.userId = user.id;
       req.session.userRole = user.role;
       req.session.userTier = user.tier;
+      // Send welcome email asynchronously — do NOT await so it never delays the response
+      sendWelcomeEmail(user.name, user.email);
       res.status(201).json(safeUser(user));
     } catch (e: any) { res.status(500).json({ error: "Registration failed" }); }
   });
