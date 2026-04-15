@@ -8,10 +8,7 @@ export default function NotFound() {
       <div className="text-center max-w-md">
         {/* Animated 404 */}
         <div className="relative mb-8">
-          <p className="text-[120px] font-bold leading-none select-none" style={{
-            fontFamily: "'Boska', Georgia, serif",
-            color: "hsl(43 96% 58% / 0.15)",
-          }}>404</p>
+          <p className="text-[120px] font-bold leading-none select-none font-display text-gold/15">404</p>
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="w-24 h-24 rounded-2xl border-2 border-primary/30 bg-primary/5 flex items-center justify-center">
               <Search size={36} className="text-primary/50" />
@@ -19,7 +16,7 @@ export default function NotFound() {
           </div>
         </div>
 
-        <h1 className="text-2xl font-bold mb-2" style={{ fontFamily: "'Boska', Georgia, serif" }}>
+        <h1 className="text-2xl font-bold mb-2 font-display">
           Page not found
         </h1>
         <p className="text-muted-foreground text-sm mb-8 leading-relaxed">

@@ -1,0 +1,12 @@
+{
+  "id": 1,
+  "title": "Royal Elegance",
+  "category": "birthday",
+  "status": "published",
+  "preview_image": null,
+  "canvas_json": "{\"background\":\"#1a0533\",\"objects\":[{\"type\":\"rect\",\"left\":0,\"top\":0,\"width\":800,\"height\":1000,\"fill\":\"#1a0533\",\"selectable\":false,\"evented\":false,\"customType\":\"background\",\"locked\":true},{\"type\":\"circle\",\"left\":300,\"top\":150,\"radius\":200,\"fill\":\"rgba(255,215,0,0.08)\",\"selectable\":false,\"evented\":false,\"locked\":true},{\"type\":\"rect\",\"left\":60,\"top\":60,\"width\":680,\"height\":880,\"fill\":\"transparent\",\"stroke\":\"rgba(255,215,0,0.4)\",\"strokeWidth\":2,\"rx\":16,\"ry\":16,\"selectable\":false,\"evented\":false,\"locked\":true},{\"type\":\"circle\",\"left\":200,\"top\":200,\"radius\":180,\"fill\":\"rgba(255,255,255,0.06)\",\"stroke\":\"rgba(255,215,0,0.5)\",\"strokeWidth\":3,\"selectable\":true,\"customType\":\"photo_frame\",\"editable\":true,\"movable\":true,\"resizable\":true},{\"type\":\"text\",\"text\":\"Happy Birthday\",\"left\":400,\"top\":430,\"fontSize\":42,\"fontFamily\":\"Georgia\",\"fill\":\"#FFD700\",\"textAlign\":\"center\",\"originX\":\"center\",\"customType\":\"greeting\",\"editable\":true,\"movable\":true,\"styleEditable\":true},{\"type\":\"text\",\"text\":\"JOHN DOE\",\"left\":400,\"top\":500,\"fontSize\":58,\"fontFamily\":\"Georgia\",\"fontWeight\":\"bold\",\"fill\":\"#FFFFFF\",\"textAlign\":\"center\",\"originX\":\"center\",\"customType\":\"name\",\"editable\":true,\"movable\":true,\"styleEditable\":true},{\"type\":\"text\",\"text\":\"April 15, 2026\",\"left\":400,\"top\":590,\"fontSize\":28,\"fontFamily\":\"Georgia\",\"fill\":\"#FFD700\",\"textAlign\":\"center\",\"originX\":\"center\",\"customType\":\"date\",\"editable\":true,\"movable\":true,\"styleEditable\":true},{\"type\":\"text\",\"text\":\"Celebrating a Life Well Lived\",\"left\":400,\"top\":650,\"fontSize\":20,\"fontFamily\":\"Georgia\",\"fontStyle\":\"italic\",\"fill\":\"rgba(255,255,255,0.7)\",\"textAlign\":\"center\",\"originX\":\"center\",\"customType\":\"subtitle\",\"editable\":true,\"movable\":true,\"styleEditable\":true},{\"type\":\"rect\",\"left\":200,\"top\":720,\"width\":400,\"height\":2,\"fill\":\"rgba(255,215,0,0.5)\",\"selectable\":false,\"evented\":false,\"locked\":true}]}",
+  "thumbnail_color": "#2d0a5e",
+  "is_pro": 0,
+  "usage_count": 0,
+  "created_at": "2026-04-15T10:53:17.400Z"
+}

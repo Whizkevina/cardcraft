@@ -1,0 +1,53 @@
+- generic [ref=e2]:
+  - generic [ref=e23]:
+    - banner [ref=e24]:
+      - generic [ref=e25]:
+        - link "CardCraft CardCraft" [ref=e26] [cursor=pointer]:
+          - /url: "#/"
+          - generic [ref=e27]:
+            - img "CardCraft" [ref=e28]
+            - generic [ref=e32]: CardCraft
+        - navigation [ref=e33]:
+          - link "Templates" [ref=e34] [cursor=pointer]:
+            - /url: "#/templates"
+          - link "Bulk Generate" [ref=e35] [cursor=pointer]:
+            - /url: "#/bulk"
+        - generic [ref=e36]:
+          - button "Toggle theme" [ref=e37] [cursor=pointer]:
+            - img [ref=e38]
+          - generic [ref=e40]:
+            - link "Sign In" [ref=e41] [cursor=pointer]:
+              - /url: "#/auth"
+              - button "Sign In" [ref=e42]
+            - link "Get Started" [ref=e43] [cursor=pointer]:
+              - /url: "#/templates"
+              - button "Get Started" [ref=e44]
+    - main [ref=e45]:
+      - generic [ref=e46]:
+        - generic [ref=e47]:
+          - img [ref=e48]
+          - text: 0 Card Templates
+        - heading "Choose a Template" [level=1] [ref=e54]
+        - paragraph [ref=e55]: Click any template to preview it, then open in the editor to customize.
+      - generic [ref=e56]:
+        - generic [ref=e57]:
+          - img [ref=e58]
+          - textbox "Search templates…" [ref=e61]
+        - button "All 0" [ref=e63] [cursor=pointer]:
+          - img [ref=e64]
+          - text: All
+          - generic [ref=e70]: "0"
+      - generic [ref=e71]:
+        - img [ref=e72]
+        - heading "No templates found" [level=3] [ref=e75]
+        - paragraph [ref=e76]: No templates in this category yet.
+        - button "Clear filters" [ref=e77] [cursor=pointer]
+      - generic [ref=e78]:
+        - generic [ref=e79]:
+          - heading "Start from scratch" [level=3] [ref=e80]
+          - paragraph [ref=e81]: Blank canvas with all editing tools.
+        - button "Blank Canvas" [ref=e82] [cursor=pointer]:
+          - text: Blank Canvas
+          - img
+  - region "Notifications (F8)":
+    - list

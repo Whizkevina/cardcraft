@@ -150,10 +150,8 @@ export default function SharePage() {
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="border-b border-border bg-card px-4 h-12 flex items-center justify-between">
-        <Link href="/">
-          <a className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+        <Link href="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft size={15} /> CardCraft
-          </a>
         </Link>
         {rendered && card && (
           <Button size="sm" onClick={handleDownload} className="gap-1.5 text-xs h-8">

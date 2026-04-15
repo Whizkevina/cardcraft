@@ -161,7 +161,7 @@ export default function LegalPage() {
             ? <Shield size={22} className="text-gold flex-shrink-0" />
             : <FileText size={22} className="text-gold flex-shrink-0" />}
           <div>
-            <h1 className="text-2xl font-bold" style={{ fontFamily: "'Boska', Georgia, serif" }}>
+            <h1 className="text-2xl font-bold font-display">
               {isPrivacy ? "Privacy Policy" : "Terms of Service"}
             </h1>
             <p className="text-xs text-muted-foreground">Last updated: {LAST_UPDATED}</p>

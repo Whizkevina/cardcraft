@@ -97,7 +97,7 @@ async function flushPendingDesign(userId: number, navigate: (to: string) => void
     });
     if (res.ok) {
       const project = await res.json();
-      navigate(`/editor/project/${project.id}`);
+      navigate(`/editor/p/${project.id}`);
     } else {
       navigate("/projects");
     }
@@ -128,10 +128,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return res.json();
     },
     onSuccess: async (data: any) => {
-      if (data?.needsPasswordChange) setNeedsPwChange(true);
-      // Hard refetch (not just invalidate) so navbar updates immediately
-      await qc.refetchQueries({ queryKey: ["/api/auth/me"] });
-      await flushPendingDesign(data?.id, navigate);
+      console.log("[AUTH] Login success, data:", data);
+      if (data?.user?.needsPasswordChange) setNeedsPwChange(true);
+      // Invalidate the auth query so it refetches immediately
+      await qc.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      // Wait a bit for the session to be fully set
+      await new Promise(resolve => setTimeout(resolve, 100));
+      // Then flush pending design
+      await flushPendingDesign(data?.user?.id, navigate);
     },
   });
 
@@ -142,9 +146,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return res.json();
     },
     onSuccess: async (data: any) => {
-      // Hard refetch so navbar shows user immediately
-      await qc.refetchQueries({ queryKey: ["/api/auth/me"] });
-      await flushPendingDesign(data?.id, navigate);
+      console.log("[AUTH] Register success, data:", data);
+      // Invalidate the auth query so it refetches immediately
+      await qc.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      // Wait a bit for the session to be fully set
+      await new Promise(resolve => setTimeout(resolve, 100));
+      // Then flush pending design
+      await flushPendingDesign(data?.user?.id, navigate);
     },
   });
 

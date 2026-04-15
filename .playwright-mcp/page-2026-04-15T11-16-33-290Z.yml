@@ -1,0 +1,96 @@
+- generic [ref=e2]:
+  - generic [ref=e83]:
+    - banner [ref=e84]:
+      - generic [ref=e85]:
+        - link "Templates" [ref=e86] [cursor=pointer]:
+          - /url: "#/templates"
+          - generic [ref=e87]:
+            - img [ref=e88]
+            - generic [ref=e90]: Templates
+        - textbox "Project title" [ref=e92]: Untitled Card
+      - generic [ref=e93]:
+        - button "Undo (Ctrl+Z)" [disabled] [ref=e94]:
+          - img [ref=e95]
+        - button "Redo (Ctrl+Y)" [disabled] [ref=e98]:
+          - img [ref=e99]
+        - button "Zoom out" [ref=e103] [cursor=pointer]:
+          - img [ref=e104]
+        - generic [ref=e107]: 100%
+        - button "Zoom in" [ref=e108] [cursor=pointer]:
+          - img [ref=e109]
+        - button "Fit to view" [ref=e112] [cursor=pointer]:
+          - img [ref=e113]
+      - generic [ref=e118]:
+        - button "PNG" [ref=e119] [cursor=pointer]:
+          - img
+          - text: PNG
+        - button "JPG" [ref=e120] [cursor=pointer]:
+          - img
+          - text: JPG
+        - button "Save" [ref=e121] [cursor=pointer]:
+          - img
+          - text: Save
+    - generic [ref=e122]:
+      - complementary [ref=e123]:
+        - paragraph [ref=e125]: Layers
+        - paragraph [ref=e127]: No layers yet
+        - generic [ref=e128]:
+          - paragraph [ref=e129]: Add Element
+          - button "Add Text" [ref=e130] [cursor=pointer]:
+            - img [ref=e131]
+            - text: Add Text
+          - generic [ref=e133] [cursor=pointer]:
+            - img [ref=e134]
+            - text: Add Photo
+          - generic [ref=e138] [cursor=pointer]:
+            - img [ref=e139]
+            - text: Add Logo
+          - button "Rectangle" [ref=e142] [cursor=pointer]:
+            - img [ref=e143]
+            - text: Rectangle
+          - button "Circle" [ref=e149] [cursor=pointer]:
+            - img [ref=e150]
+            - text: Circle
+      - main [ref=e156]
+      - complementary [ref=e160]:
+        - generic [ref=e161]:
+          - tablist [ref=e162]:
+            - tab "Style" [selected] [ref=e163] [cursor=pointer]
+            - tab "Text" [disabled]
+            - tab "Export" [ref=e164] [cursor=pointer]
+          - tabpanel "Style" [ref=e165]:
+            - generic [ref=e166]:
+              - paragraph [ref=e167]: Background
+              - generic [ref=e168]:
+                - button "Royal Purple" [ref=e169] [cursor=pointer]:
+                  - img [ref=e170]
+                - button "Midnight Blue" [ref=e171] [cursor=pointer]:
+                  - img [ref=e172]
+                - button "Coral" [ref=e173] [cursor=pointer]:
+                  - img [ref=e174]
+                - button "Forest" [ref=e175] [cursor=pointer]:
+                  - img [ref=e176]
+                - button "Rose Gold" [ref=e177] [cursor=pointer]:
+                  - img [ref=e178]
+                - button "Pearl White" [ref=e179] [cursor=pointer]:
+                  - img [ref=e180]
+                - button "Charcoal" [ref=e181] [cursor=pointer]:
+                  - img [ref=e182]
+                - button "Sky Blue" [ref=e183] [cursor=pointer]:
+                  - img [ref=e184]
+                - button "Plum" [ref=e185] [cursor=pointer]:
+                  - img [ref=e186]
+                - button "Navy" [ref=e187] [cursor=pointer]:
+                  - img [ref=e188]
+                - button "Floral Pink" [ref=e189] [cursor=pointer]:
+                  - img [ref=e190]
+                - button "Olive" [ref=e191] [cursor=pointer]:
+                  - img [ref=e192]
+              - generic [ref=e193]:
+                - textbox [ref=e194] [cursor=pointer]: "#1a0533"
+                - generic [ref=e195]: Custom color
+            - button "Clear Canvas" [ref=e196] [cursor=pointer]:
+              - img [ref=e197]
+              - text: Clear Canvas
+  - region "Notifications (F8)":
+    - list

@@ -4,7 +4,8 @@ import { apiRequest } from "@/lib/queryClient";
 import Navbar from "../components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Sparkles, ArrowRight, Palette, GraduationCap, Church, Building2, Search, X } from "lucide-react";
 import type { Template } from "@shared/schema";
 
@@ -43,27 +44,71 @@ const ACCENT_MAP: Record<string, { bg: string; accent: string; shape: "circle" |
   "#1a2a1a": { bg: "#FFFFFF", accent: "#4CAF50", shape: "circle" },
 };
 
+const PREVIEW_THEME_CLASSES: Record<string, { bg: string; accent: string; border: string; fill: string; badge: string }> = {
+  "#2d0a5e": { bg: "bg-[#1a0533]", accent: "text-[#FFD700]", border: "border-[#FFD700]", fill: "bg-[#FFD700]", badge: "bg-[#FFD700]/15 text-[#FFD700] border-[#FFD700]/40" },
+  "#FF6B6B": { bg: "bg-[#FF6B6B]", accent: "text-[#FFFFFF]", border: "border-[#FFFFFF]", fill: "bg-[#FFFFFF]", badge: "bg-[#FFFFFF]/15 text-[#FFFFFF] border-[#FFFFFF]/40" },
+  "#FAFAF8": { bg: "bg-[#FAFAF8]", accent: "text-[#2D2D2D]", border: "border-[#2D2D2D]", fill: "bg-[#2D2D2D]", badge: "bg-[#2D2D2D]/10 text-[#2D2D2D] border-[#2D2D2D]/30" },
+  "#0a1628": { bg: "bg-[#0a1628]", accent: "text-[#D4AF37]", border: "border-[#D4AF37]", fill: "bg-[#D4AF37]", badge: "bg-[#D4AF37]/15 text-[#D4AF37] border-[#D4AF37]/40" },
+  "#4a1942": { bg: "bg-[#4a1942]", accent: "text-[#FFD700]", border: "border-[#FFD700]", fill: "bg-[#FFD700]", badge: "bg-[#FFD700]/15 text-[#FFD700] border-[#FFD700]/40" },
+  "#0f2744": { bg: "bg-[#0f2744]", accent: "text-[#C9A84C]", border: "border-[#C9A84C]", fill: "bg-[#C9A84C]", badge: "bg-[#C9A84C]/15 text-[#C9A84C] border-[#C9A84C]/40" },
+  "#7b3f6e": { bg: "bg-[#7b3f6e]", accent: "text-[#FFB6C1]", border: "border-[#FFB6C1]", fill: "bg-[#FFB6C1]", badge: "bg-[#FFB6C1]/15 text-[#FFB6C1] border-[#FFB6C1]/40" },
+  "#5c1a00": { bg: "bg-[#2a0800]", accent: "text-[#f09820]", border: "border-[#f09820]", fill: "bg-[#f09820]", badge: "bg-[#f09820]/15 text-[#f09820] border-[#f09820]/40" },
+  "#0d4a2e": { bg: "bg-[#0d4a2e]", accent: "text-[#D4AF37]", border: "border-[#D4AF37]", fill: "bg-[#D4AF37]", badge: "bg-[#D4AF37]/15 text-[#D4AF37] border-[#D4AF37]/40" },
+  "#6b0f2b": { bg: "bg-[#6b0f2b]", accent: "text-[#FFB6C1]", border: "border-[#FFB6C1]", fill: "bg-[#FFB6C1]", badge: "bg-[#FFB6C1]/15 text-[#FFB6C1] border-[#FFB6C1]/40" },
+  "#1a4a7a": { bg: "bg-[#1a4a7a]", accent: "text-[#FFFFFF]", border: "border-[#FFFFFF]", fill: "bg-[#FFFFFF]", badge: "bg-[#FFFFFF]/15 text-[#FFFFFF] border-[#FFFFFF]/40" },
+  "#7a3a00": { bg: "bg-[#FFF8F0]", accent: "text-[#7a3a00]", border: "border-[#7a3a00]", fill: "bg-[#7a3a00]", badge: "bg-[#7a3a00]/10 text-[#7a3a00] border-[#7a3a00]/30" },
+  "#1c3a5c": { bg: "bg-[#1c3a5c]", accent: "text-[#C9A84C]", border: "border-[#C9A84C]", fill: "bg-[#C9A84C]", badge: "bg-[#C9A84C]/15 text-[#C9A84C] border-[#C9A84C]/40" },
+  "#1a1a2e": { bg: "bg-[#1a1a2e]", accent: "text-[#e8b800]", border: "border-[#e8b800]", fill: "bg-[#e8b800]", badge: "bg-[#e8b800]/15 text-[#e8b800] border-[#e8b800]/40" },
+  "#8b0000": { bg: "bg-[#1a0000]", accent: "text-[#FF6B6B]", border: "border-[#FF6B6B]", fill: "bg-[#FF6B6B]", badge: "bg-[#FF6B6B]/15 text-[#FF6B6B] border-[#FF6B6B]/40" },
+  "#7a2060": { bg: "bg-[#FDF0F8]", accent: "text-[#7a2060]", border: "border-[#7a2060]", fill: "bg-[#7a2060]", badge: "bg-[#7a2060]/10 text-[#7a2060] border-[#7a2060]/30" },
+  "#0a2a4a": { bg: "bg-[#0a2a4a]", accent: "text-[#C9A84C]", border: "border-[#C9A84C]", fill: "bg-[#C9A84C]", badge: "bg-[#C9A84C]/15 text-[#C9A84C] border-[#C9A84C]/40" },
+  "#0a0a1a": { bg: "bg-[#0a0a1a]", accent: "text-[#FFD700]", border: "border-[#FFD700]", fill: "bg-[#FFD700]", badge: "bg-[#FFD700]/15 text-[#FFD700] border-[#FFD700]/40" },
+  "#0d3b1e": { bg: "bg-[#0d3b1e]", accent: "text-[#FF4444]", border: "border-[#FF4444]", fill: "bg-[#FF4444]", badge: "bg-[#FF4444]/15 text-[#FF4444] border-[#FF4444]/40" },
+  "#1a2a1a": { bg: "bg-[#FFFFFF]", accent: "text-[#4CAF50]", border: "border-[#4CAF50]", fill: "bg-[#4CAF50]", badge: "bg-[#4CAF50]/15 text-[#4CAF50] border-[#4CAF50]/40" },
+};
+
+const getPreviewTheme = (thumbnailColor: string) => PREVIEW_THEME_CLASSES[thumbnailColor] || {
+  bg: `bg-[${thumbnailColor}]`,
+  accent: "text-[#FFFFFF]",
+  border: "border-[#FFFFFF]",
+  fill: "bg-[#FFFFFF]",
+  badge: "bg-white/15 text-white border-white/40",
+};
+
+const previewBarWidthClass = (percentage: number) => {
+  if (percentage >= 90) return "w-[78%]";
+  if (percentage >= 70) return "w-[72%]";
+  if (percentage >= 50) return "w-[60%]";
+  if (percentage >= 30) return "w-[48%]";
+  return "w-[38%]";
+};
+
 // ─── Preview modal ────────────────────────────────────────────────────────────
 function PreviewModal({ template, onClose }: { template: Template; onClose: () => void }) {
   const style = ACCENT_MAP[template.thumbnailColor] || { bg: template.thumbnailColor, accent: "#FFFFFF", shape: "circle" };
+  const theme = getPreviewTheme(template.thumbnailColor);
 
   return (
     <Dialog open onOpenChange={v => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-sm p-0 overflow-hidden rounded-2xl">
+      <DialogContent className="max-w-sm p-0 overflow-hidden rounded-2xl" aria-describedby={undefined}>
+        <VisuallyHidden>
+          <DialogTitle>Preview Template</DialogTitle>
+        </VisuallyHidden>
         {/* Card preview */}
-        <div className="aspect-[4/5] relative" style={{ background: style.bg }}>
+        <div className={`aspect-[4/5] relative ${theme.bg}`}>
           {style.shape === "circle" ? (
-            <div className="absolute top-10 left-1/2 -translate-x-1/2 w-32 h-32 rounded-full border-2 flex items-center justify-center"
-              style={{ borderColor: style.accent, opacity: 0.65, background: `${style.accent}11` }}>
-              <svg viewBox="0 0 24 24" fill="none" className="w-14 h-14" style={{ color: style.accent, opacity: 0.4 }}>
+            <div className="absolute top-10 left-1/2 -translate-x-1/2 w-32 h-32 rounded-full border-2 flex items-center justify-center">
+              <div className={`absolute inset-0 rounded-full border-2 opacity-65 ${theme.border}`} />
+              <div className={`absolute inset-0 rounded-full ${theme.fill} opacity-10`} />
+              <svg viewBox="0 0 24 24" fill="none" className={`relative z-10 w-14 h-14 ${theme.accent} opacity-40`}>
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="1.5"/>
                 <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="1.5"/>
               </svg>
             </div>
           ) : (
-            <div className="absolute top-10 left-1/2 -translate-x-1/2 w-32 h-32 border-2 flex items-center justify-center"
-              style={{ borderColor: style.accent }}>
-              <svg viewBox="0 0 24 24" fill="none" className="w-12 h-12" style={{ color: style.accent, opacity: 0.4 }}>
+            <div className="absolute top-10 left-1/2 -translate-x-1/2 w-32 h-32 border-2 flex items-center justify-center">
+              <div className={`absolute inset-0 border-2 ${theme.border}`} />
+              <svg viewBox="0 0 24 24" fill="none" className={`relative z-10 w-12 h-12 ${theme.accent} opacity-40`}>
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="1.5"/>
                 <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="1.5"/>
               </svg>
@@ -71,9 +116,9 @@ function PreviewModal({ template, onClose }: { template: Template; onClose: () =
           )}
 
           <div className="absolute bottom-16 left-0 right-0 text-center space-y-2 px-4">
-            <div className="h-4 rounded-full mx-auto" style={{ background: style.accent, opacity: 0.8, width: "60%" }} />
-            <div className="h-5 rounded-full mx-auto font-bold" style={{ background: style.accent, opacity: 0.95, width: "78%" }} />
-            <div className="h-3 rounded-full mx-auto" style={{ background: style.accent, opacity: 0.5, width: "44%" }} />
+            <div className={`h-4 rounded-full mx-auto ${theme.fill} opacity-80 w-[60%]`} />
+            <div className={`h-5 rounded-full mx-auto font-bold ${theme.fill} opacity-95 w-[78%]`} />
+            <div className={`h-3 rounded-full mx-auto ${theme.fill} opacity-50 w-[44%]`} />
           </div>
 
           <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
@@ -81,7 +126,7 @@ function PreviewModal({ template, onClose }: { template: Template; onClose: () =
             <p className="text-white/70 text-xs capitalize">{template.category}</p>
           </div>
 
-          <button onClick={onClose} className="absolute top-3 right-3 w-7 h-7 rounded-full bg-black/40 flex items-center justify-center text-white hover:bg-black/60 transition-colors">
+          <button onClick={onClose} title="Close preview" className="absolute top-3 right-3 w-7 h-7 rounded-full bg-black/40 flex items-center justify-center text-white hover:bg-black/60 transition-colors">
             <X size={14} />
           </button>
         </div>
@@ -107,6 +152,7 @@ function PreviewModal({ template, onClose }: { template: Template; onClose: () =
 // ─── Template card ────────────────────────────────────────────────────────────
 function TemplateCard({ template, onPreview }: { template: Template; onPreview: () => void }) {
   const style = ACCENT_MAP[template.thumbnailColor] || { bg: template.thumbnailColor, accent: "#FFFFFF", shape: "circle" };
+  const theme = getPreviewTheme(template.thumbnailColor);
 
   return (
     <div
@@ -114,18 +160,19 @@ function TemplateCard({ template, onPreview }: { template: Template; onPreview: 
       onClick={onPreview}
       data-testid={`card-template-${template.id}`}
     >
-      <div className="aspect-[4/5] relative" style={{ background: style.bg }}>
+      <div className={`aspect-[4/5] relative ${theme.bg}`}>
         {style.shape === "circle" ? (
-          <div className="absolute top-6 left-1/2 -translate-x-1/2 w-20 h-20 rounded-full border-2 flex items-center justify-center"
-            style={{ borderColor: style.accent, opacity: 0.65, background: `${style.accent}11` }}>
-            <svg viewBox="0 0 24 24" fill="none" className="w-9 h-9" style={{ color: style.accent, opacity: 0.45 }}>
+          <div className="absolute top-6 left-1/2 -translate-x-1/2 w-20 h-20 rounded-full border-2 flex items-center justify-center">
+            <div className={`absolute inset-0 rounded-full border-2 opacity-65 ${theme.border}`} />
+            <div className={`absolute inset-0 rounded-full ${theme.fill} opacity-10`} />
+            <svg viewBox="0 0 24 24" fill="none" className={`relative z-10 w-9 h-9 ${theme.accent} opacity-45`}>
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="1.5"/>
               <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="1.5"/>
             </svg>
           </div>
         ) : (
-          <div className="absolute top-6 left-6 w-16 h-16 border-2 flex items-center justify-center" style={{ borderColor: style.accent }}>
-            <svg viewBox="0 0 24 24" fill="none" className="w-8 h-8" style={{ color: style.accent, opacity: 0.4 }}>
+          <div className={`absolute top-6 left-6 w-16 h-16 border-2 flex items-center justify-center ${theme.border}`}>
+            <svg viewBox="0 0 24 24" fill="none" className={`w-8 h-8 ${theme.accent} opacity-40`}>
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="1.5"/>
               <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="1.5"/>
             </svg>
@@ -133,9 +180,9 @@ function TemplateCard({ template, onPreview }: { template: Template; onPreview: 
         )}
 
         <div className={`absolute ${style.shape === "circle" ? "bottom-8 left-0 right-0 text-center space-y-1.5" : "bottom-8 left-4 right-2 space-y-1.5"}`}>
-          <div className={`h-2.5 rounded-full ${style.shape === "circle" ? "mx-auto" : ""}`} style={{ background: style.accent, opacity: 0.8, width: style.shape === "circle" ? "55%" : "70%" }} />
-          <div className={`h-3 rounded-full ${style.shape === "circle" ? "mx-auto" : ""}`} style={{ background: style.accent, opacity: 0.95, width: style.shape === "circle" ? "72%" : "50%" }} />
-          <div className={`h-2 rounded-full ${style.shape === "circle" ? "mx-auto" : ""}`} style={{ background: style.accent, opacity: 0.5, width: style.shape === "circle" ? "40%" : "38%" }} />
+          <div className={`h-2.5 rounded-full ${style.shape === "circle" ? "mx-auto w-[55%]" : "w-[70%]"} ${theme.fill} opacity-80`} />
+          <div className={`h-3 rounded-full ${style.shape === "circle" ? "mx-auto w-[72%]" : "w-[50%]"} ${theme.fill} opacity-95`} />
+          <div className={`h-2 rounded-full ${style.shape === "circle" ? "mx-auto w-[40%]" : "w-[38%]"} ${theme.fill} opacity-50`} />
         </div>
 
         <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -144,8 +191,7 @@ function TemplateCard({ template, onPreview }: { template: Template; onPreview: 
           </div>
         </div>
 
-        <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded-full text-[10px] font-medium capitalize"
-          style={{ background: `${style.accent}22`, color: style.accent, border: `1px solid ${style.accent}44` }}>
+        <div className={`absolute top-2 left-2 px-1.5 py-0.5 rounded-full text-[10px] font-medium capitalize border ${theme.badge}`}>
           {template.category}
         </div>
       </div>
@@ -195,7 +241,7 @@ export default function Gallery() {
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/15 border border-primary/30 text-xs font-medium text-gold mb-4">
             <Palette size={11} /> {templates.length} Card Templates
           </div>
-          <h1 className="text-3xl font-bold mb-1" style={{ fontFamily: "'Boska', Georgia, serif" }}>Choose a Template</h1>
+          <h1 className="text-3xl font-bold mb-1 font-display">Choose a Template</h1>
           <p className="text-muted-foreground text-sm">Click any template to preview it, then open in the editor to customize.</p>
         </div>
 
@@ -211,7 +257,7 @@ export default function Gallery() {
               data-testid="input-template-search"
             />
             {search && (
-              <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+              <button onClick={() => setSearch("")} title="Clear search" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                 <X size={13} />
               </button>
             )}

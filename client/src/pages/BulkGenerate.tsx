@@ -192,7 +192,7 @@ export default function BulkGenerate() {
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/15 border border-primary/30 text-xs font-medium text-gold mb-4">
             <Layers size={11} /> Bulk Generation
           </div>
-          <h1 className="text-2xl font-bold mb-2" style={{ fontFamily: "'Boska', Georgia, serif" }}>
+          <h1 className="text-2xl font-bold mb-2 font-display">
             Generate Cards in Bulk
           </h1>
           <p className="text-muted-foreground text-sm">
@@ -214,7 +214,7 @@ export default function BulkGenerate() {
               {templates.map(t => (
                 <SelectItem key={t.id} value={String(t.id)}>
                   <span className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full inline-block" style={{ background: t.thumbnailColor }} />
+                    <img alt="" aria-hidden="true" src={colorSwatchDataUri(t.thumbnailColor)} className="w-3 h-3 rounded-full inline-block object-cover" />
                     {t.title}
                   </span>
                 </SelectItem>

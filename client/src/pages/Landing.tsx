@@ -15,14 +15,25 @@ const features = [
 ];
 
 const TEMPLATES = [
-  { color: "#1a0533", accent: "#FFD700", label: "Royal Elegance", cat: "Birthday" },
-  { color: "#FF6B6B", accent: "#FFFFFF", label: "Vibrant Celebration", cat: "Birthday" },
-  { color: "#FAFAF8", accent: "#2D2D2D", label: "Modern Minimal", cat: "Birthday" },
-  { color: "#0a1628", accent: "#D4AF37", label: "Golden Graduation", cat: "Graduation" },
-  { color: "#4a1942", accent: "#FFD700", label: "Church Anniversary", cat: "Church" },
-  { color: "#0f2744", accent: "#C9A84C", label: "Corporate Milestone", cat: "Corporate" },
-  { color: "#fdf6f0", accent: "#c67ab0", label: "Floral Birthday", cat: "Birthday" },
-  { color: "#2a0800", accent: "#f09820", label: "ICT Group Style", cat: "Birthday" },
+  { label: "Royal Elegance", cat: "Birthday" },
+  { label: "Vibrant Celebration", cat: "Birthday" },
+  { label: "Modern Minimal", cat: "Birthday" },
+  { label: "Golden Graduation", cat: "Graduation" },
+  { label: "Church Anniversary", cat: "Church" },
+  { label: "Corporate Milestone", cat: "Corporate" },
+  { label: "Floral Birthday", cat: "Birthday" },
+  { label: "ICT Group Style", cat: "Birthday" },
+];
+
+const TEMPLATE_CLASSES = [
+  "template-preview-royal",
+  "template-preview-vibrant",
+  "template-preview-minimal",
+  "template-preview-graduation",
+  "template-preview-church",
+  "template-preview-corporate",
+  "template-preview-floral",
+  "template-preview-ict",
 ];
 
 const steps = [
@@ -48,7 +59,7 @@ export default function Landing() {
             <Sparkles size={11} /> Personalized cards, ready to download
           </div>
 
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-4 leading-tight" style={{ fontFamily: "'Boska', Georgia, serif" }}>
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-4 leading-tight font-display">
             Create Stunning Cards<br />
             <span className="logo-text">In Minutes, Not Hours</span>
           </h1>
@@ -75,13 +86,12 @@ export default function Landing() {
             {TEMPLATES.map((t, i) => (
               <div
                 key={i}
-                className="template-card rounded-xl overflow-hidden border border-border cursor-pointer aspect-square relative"
-                style={{ background: t.color }}
+                className={`template-card ${TEMPLATE_CLASSES[i]} rounded-xl overflow-hidden border border-border cursor-pointer aspect-square relative`}
                 onClick={() => { window.location.hash = "#/templates"; }}
                 data-testid={`card-preview-${i}`}
               >
                 <div className="absolute inset-0 flex items-end justify-center pb-1.5">
-                  <span className="text-[7px] font-medium leading-tight text-center px-1" style={{ color: t.accent, opacity: 0.9 }}>{t.label}</span>
+                  <span className={`text-[7px] font-medium leading-tight text-center px-1 template-label-${i}`}>{t.label}</span>
                 </div>
               </div>
             ))}
@@ -100,12 +110,10 @@ export default function Landing() {
             { icon: Building2, label: "Corporate", count: "1 design" },
             { icon: Layers, label: "Bulk Generate", count: "CSV upload" },
           ].map(({ icon: Icon, label, count }) => (
-            <Link key={label} href={label === "Bulk Generate" ? "/bulk" : "/templates"}>
-              <a className="flex items-center gap-2 px-4 py-2 rounded-full bg-card border border-border hover:border-primary/40 hover:bg-primary/5 transition-all text-sm text-muted-foreground hover:text-foreground">
-                <Icon size={13} className="text-gold" />
-                <span className="font-medium">{label}</span>
-                <span className="text-xs text-muted-foreground">{count}</span>
-              </a>
+            <Link key={label} href={label === "Bulk Generate" ? "/bulk" : "/templates"} className="flex items-center gap-2 px-4 py-2 rounded-full bg-card border border-border hover:border-primary/40 hover:bg-primary/5 transition-all text-sm text-muted-foreground hover:text-foreground">
+              <Icon size={13} className="text-gold" />
+              <span className="font-medium">{label}</span>
+              <span className="text-xs text-muted-foreground">{count}</span>
             </Link>
           ))}
         </div>
@@ -115,7 +123,7 @@ export default function Landing() {
       <section className="py-16 border-b border-border">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <div className="mb-10 text-center">
-            <h2 className="text-2xl sm:text-3xl font-bold mb-2" style={{ fontFamily: "'Boska', Georgia, serif" }}>
+            <h2 className="text-2xl sm:text-3xl font-bold mb-2 font-display">
               How it works
             </h2>
             <p className="text-muted-foreground text-sm">From zero to a downloadable card in under 5 minutes.</p>
@@ -123,7 +131,7 @@ export default function Landing() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {steps.map((s, i) => (
               <div key={i} className="relative">
-                <p className="text-4xl font-bold text-gold/20 mb-3" style={{ fontFamily: "'Boska', Georgia, serif" }}>{s.n}</p>
+                <p className="text-4xl font-bold text-gold/20 mb-3 font-display">{s.n}</p>
                 <h3 className="font-semibold text-sm mb-1.5">{s.title}</h3>
                 <p className="text-muted-foreground text-xs leading-relaxed">{s.desc}</p>
                 {i < steps.length - 1 && (
@@ -139,7 +147,7 @@ export default function Landing() {
       <section className="py-16">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <div className="mb-10">
-            <h2 className="text-2xl sm:text-3xl font-bold mb-2" style={{ fontFamily: "'Boska', Georgia, serif" }}>
+            <h2 className="text-2xl sm:text-3xl font-bold mb-2 font-display">
               Everything you need to design great cards
             </h2>
             <p className="text-muted-foreground text-sm max-w-md">
@@ -159,7 +167,7 @@ export default function Landing() {
       </section>
 
       {/* ── Social proof / trust signals ───────────────────────────────── */}
-      <section className="py-10 border-t border-border bg-secondary/10">
+      <section className="py-10 border-t border-border bg-secondary/30">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center">
           <div className="flex flex-wrap items-center justify-center gap-6 text-xs text-muted-foreground">
             {[
@@ -180,7 +188,7 @@ export default function Landing() {
       {/* ── CTA ────────────────────────────────────────────────────────── */}
       <section className="py-16 border-t border-border">
         <div className="max-w-xl mx-auto px-4 text-center">
-          <h2 className="text-2xl font-bold mb-2" style={{ fontFamily: "'Boska', Georgia, serif" }}>
+          <h2 className="text-2xl font-bold mb-2 font-display">
             Ready to create your first card?
           </h2>
           <p className="text-muted-foreground mb-6 text-sm">No sign-up. No watermarks. Just design and download.</p>
@@ -206,14 +214,14 @@ export default function Landing() {
             <span className="text-sm font-semibold logo-text">CardCraft</span>
           </div>
           <nav className="flex items-center gap-4 text-xs text-muted-foreground">
-            <Link href="/templates"><a className="hover:text-foreground transition-colors">Templates</a></Link>
-            <Link href="/bulk"><a className="hover:text-foreground transition-colors">Bulk Generate</a></Link>
-            <Link href="/pricing"><a className="hover:text-foreground transition-colors">Pricing</a></Link>
-            <Link href="/auth"><a className="hover:text-foreground transition-colors">Sign In</a></Link>
+            <Link href="/templates" className="hover:text-foreground transition-colors">Templates</Link>
+            <Link href="/bulk" className="hover:text-foreground transition-colors">Bulk Generate</Link>
+            <Link href="/pricing" className="hover:text-foreground transition-colors">Pricing</Link>
+            <Link href="/auth" className="hover:text-foreground transition-colors">Sign In</Link>
           </nav>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <Link href="/terms"><a className="hover:text-foreground transition-colors">Terms</a></Link>
-            <Link href="/privacy"><a className="hover:text-foreground transition-colors">Privacy</a></Link>
+            <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
+            <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
             <span>&copy; {new Date().getFullYear()} CardCraft</span>
           </div>
         </div>

@@ -14,6 +14,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 
+const colorSwatchDataUri = (color: string, width: number, height: number) =>
+  `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" rx="${Math.max(4, Math.min(width, height) / 6)}" fill="${color}"/></svg>`)}`;
+
+const progressWidthClass = (uses: number, topUses: number) => {
+  const percentage = topUses > 0 ? (uses / topUses) * 100 : 0;
+  if (percentage >= 90) return "w-full";
+  if (percentage >= 70) return "w-3/4";
+  if (percentage >= 45) return "w-1/2";
+  if (percentage >= 20) return "w-1/4";
+  if (percentage > 0) return "w-1/12";
+  return "w-0";
+};
+
 // ─── Stat card ────────────────────────────────────────────────────────────────
 function StatCard({ label, value, sub, icon: Icon, color = "text-gold" }: { label: string; value: string | number; sub?: string; icon: any; color?: string }) {
   return (
@@ -33,7 +46,12 @@ function TemplateRow({ template, onToggle, onDelete }: { template: Template; onT
   return (
     <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-card" data-testid={`row-template-${template.id}`}>
       <div className="flex items-center gap-3 min-w-0">
-        <div className="w-9 h-11 rounded-lg border border-border flex-shrink-0" style={{ background: template.thumbnailColor }} />
+        <img
+          alt=""
+          aria-hidden="true"
+          src={colorSwatchDataUri(template.thumbnailColor, 36, 44)}
+          className="w-9 h-11 rounded-lg border border-border flex-shrink-0 object-cover"
+        />
         <div className="min-w-0">
           <h3 className="font-semibold text-sm truncate">{template.title}</h3>
           <p className="text-xs text-muted-foreground capitalize">{template.category} · {(template as any).usageCount || 0} uses</p>
@@ -43,16 +61,16 @@ function TemplateRow({ template, onToggle, onDelete }: { template: Template; onT
         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${template.status === "published" ? "bg-green-500/15 text-green-500" : "bg-secondary text-muted-foreground"}`}>
           {template.status}
         </span>
-        <Link href={`/editor/t/${template.id}`}>
-          <a className="p-1.5 rounded hover:bg-primary/20 text-muted-foreground hover:text-primary transition-colors" title="Edit in Editor" data-testid={`button-edit-template-${template.id}`}>
+        <Link href={`/editor/t/${template.id}`} className="p-1.5 rounded hover:bg-primary/20 text-muted-foreground hover:text-primary transition-colors" title="Edit in Editor" data-testid={`button-edit-template-${template.id}`}>
             <Pencil size={14} />
-          </a>
         </Link>
         <button onClick={() => onToggle(template.id, template.status === "published" ? "draft" : "published")}
+          title={template.status === "published" ? "Unpublish template" : "Publish template"}
           className="p-1.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors" data-testid={`button-toggle-template-${template.id}`}>
           {template.status === "published" ? <EyeOff size={14} /> : <Eye size={14} />}
         </button>
         <button onClick={() => onDelete(template.id)}
+          title="Delete template"
           className="p-1.5 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors" data-testid={`button-delete-template-${template.id}`}>
           <Trash2 size={14} />
         </button>
@@ -85,6 +103,7 @@ function UserRow({ user, currentUserId, onTierChange, onRoleChange }: { user: Au
         </button>
         {user.id !== currentUserId && (
           <button onClick={() => onRoleChange(user.id, isAdmin ? "user" : "admin")}
+            title={isAdmin ? "Remove admin role" : "Make admin"}
             className={`p-1.5 rounded hover:bg-secondary transition-colors ${isAdmin ? "text-gold" : "text-muted-foreground hover:text-foreground"}`}
             data-testid={`button-role-${user.id}`}>
             <Shield size={13} />
@@ -128,7 +147,7 @@ function CreateTemplateDialog({ onCreated }: { onCreated: () => void }) {
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Background Color</label>
             <div className="flex items-center gap-3">
-              <input type="color" value={color} onChange={e => setColor(e.target.value)} className="w-10 h-10 rounded cursor-pointer border border-border" />
+                  <input type="color" value={color} onChange={e => setColor(e.target.value)} className="w-10 h-10 rounded cursor-pointer border border-border" aria-label="Background color" title="Background color" />
               <span className="text-sm text-muted-foreground">{color}</span>
             </div>
           </div>
@@ -212,7 +231,7 @@ export default function AdminPage() {
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <div className="flex items-center gap-2 mb-1"><Shield size={18} className="text-gold" /><h1 className="text-2xl font-bold" style={{ fontFamily: "'Boska', Georgia, serif" }}>Admin Panel</h1></div>
+            <div className="flex items-center gap-2 mb-1"><Shield size={18} className="text-gold" /><h1 className="text-2xl font-bold font-display">Admin Panel</h1></div>
             <p className="text-muted-foreground text-sm">Analytics, users, and template management.</p>
           </div>
           <CreateTemplateDialog onCreated={() => {}} />
@@ -251,12 +270,17 @@ export default function AdminPage() {
                         {analytics.topTemplates?.map((t: any, i: number) => (
                           <div key={t.id} className="flex items-center gap-3">
                             <span className="text-xs font-bold text-muted-foreground w-5 text-right">{i + 1}</span>
-                            <div className="w-6 h-8 rounded flex-shrink-0" style={{ background: t.thumbnailColor }} />
+                            <img
+                              alt=""
+                              aria-hidden="true"
+                              src={colorSwatchDataUri(t.thumbnailColor, 24, 32)}
+                              className="w-6 h-8 rounded flex-shrink-0 object-cover"
+                            />
                             <div className="flex-1 min-w-0">
                               <p className="text-xs font-medium truncate">{t.title}</p>
                               <div className="flex items-center gap-2 mt-0.5">
                                 <div className="flex-1 bg-secondary rounded-full h-1.5">
-                                  <div className="h-1.5 rounded-full bg-primary transition-all" style={{ width: `${Math.min(100, (t.uses / (analytics.topTemplates[0]?.uses || 1)) * 100)}%` }} />
+                                  <div className={`h-1.5 rounded-full bg-primary transition-all ${progressWidthClass(t.uses, analytics.topTemplates[0]?.uses || 1)}`} />
                                 </div>
                                 <span className="text-[10px] text-muted-foreground flex-shrink-0">{t.uses} uses</span>
                               </div>

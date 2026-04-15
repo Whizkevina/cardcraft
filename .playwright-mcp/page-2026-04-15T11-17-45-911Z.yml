@@ -1,0 +1,33 @@
+- generic [ref=e2]:
+  - generic [ref=e202]:
+    - banner [ref=e203]:
+      - generic [ref=e204]:
+        - link "CardCraft CardCraft" [ref=e205] [cursor=pointer]:
+          - /url: "#/"
+          - generic [ref=e206]:
+            - img "CardCraft" [ref=e207]
+            - generic [ref=e211]: CardCraft
+        - navigation [ref=e212]:
+          - link "Templates" [ref=e213] [cursor=pointer]:
+            - /url: "#/templates"
+          - link "Bulk Generate" [ref=e214] [cursor=pointer]:
+            - /url: "#/bulk"
+        - generic [ref=e215]:
+          - button "Toggle theme" [ref=e216] [cursor=pointer]:
+            - img [ref=e217]
+          - generic [ref=e219]:
+            - link "Sign In" [ref=e220] [cursor=pointer]:
+              - /url: "#/auth"
+              - button "Sign In" [ref=e221]
+            - link "Get Started" [ref=e222] [cursor=pointer]:
+              - /url: "#/templates"
+              - button "Get Started" [ref=e223]
+    - generic [ref=e224]:
+      - img [ref=e225]
+      - heading "Sign in to save cards" [level=2] [ref=e227]
+      - paragraph [ref=e228]: Create a free account to save and revisit your designs.
+      - link "Sign In / Register" [ref=e229] [cursor=pointer]:
+        - /url: "#/auth"
+        - button "Sign In / Register" [ref=e230]
+  - region "Notifications (F8)":
+    - list

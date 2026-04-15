@@ -211,7 +211,7 @@ export default function Projects() {
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-bold" style={{ fontFamily: "'Boska', Georgia, serif" }}>My Cards</h1>
+            <h1 className="text-2xl font-bold font-display">My Cards</h1>
             <p className="text-muted-foreground text-sm">{projects.length} saved {projects.length === 1 ? "card" : "cards"}</p>
           </div>
           <Link href="/templates">

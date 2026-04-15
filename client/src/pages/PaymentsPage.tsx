@@ -50,7 +50,7 @@ export default function PaymentsPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-bold mb-1" style={{ fontFamily: "'Boska', Georgia, serif" }}>Payment History</h1>
+            <h1 className="text-2xl font-bold mb-1 font-display">Payment History</h1>
             <p className="text-muted-foreground text-sm">Your receipts and transaction records.</p>
           </div>
           {!isPro && (

@@ -1,0 +1,222 @@
+[
+  {
+    "id": 1,
+    "title": "Royal Elegance",
+    "category": "birthday",
+    "status": "published",
+    "thumbnail_color": "#2d0a5e",
+    "is_pro": 0,
+    "usage_count": 0,
+    "created_at": "2026-04-15T10:53:17.400Z",
+    "canvas_json_size": 1853
+  },
+  {
+    "id": 2,
+    "title": "Vibrant Celebration",
+    "category": "birthday",
+    "status": "published",
+    "thumbnail_color": "#FF6B6B",
+    "is_pro": 0,
+    "usage_count": 0,
+    "created_at": "2026-04-15T10:53:17.400Z",
+    "canvas_json_size": 1829
+  },
+  {
+    "id": 3,
+    "title": "Modern Minimal",
+    "category": "birthday",
+    "status": "published",
+    "thumbnail_color": "#FAFAF8",
+    "is_pro": 0,
+    "usage_count": 0,
+    "created_at": "2026-04-15T10:53:17.400Z",
+    "canvas_json_size": 1596
+  },
+  {
+    "id": 4,
+    "title": "Golden Graduation",
+    "category": "graduation",
+    "status": "published",
+    "thumbnail_color": "#0a1628",
+    "is_pro": 0,
+    "usage_count": 0,
+    "created_at": "2026-04-15T10:53:17.400Z",
+    "canvas_json_size": 2363
+  },
+  {
+    "id": 5,
+    "title": "Church Anniversary",
+    "category": "church",
+    "status": "published",
+    "thumbnail_color": "#4a1942",
+    "is_pro": 0,
+    "usage_count": 0,
+    "created_at": "2026-04-15T10:53:17.400Z",
+    "canvas_json_size": 2582
+  },
+  {
+    "id": 6,
+    "title": "Corporate Milestone",
+    "category": "corporate",
+    "status": "published",
+    "thumbnail_color": "#0f2744",
+    "is_pro": 0,
+    "usage_count": 0,
+    "created_at": "2026-04-15T10:53:17.400Z",
+    "canvas_json_size": 2462
+  },
+  {
+    "id": 7,
+    "title": "Warm Celebration",
+    "category": "birthday",
+    "status": "published",
+    "thumbnail_color": "#5c1a00",
+    "is_pro": 0,
+    "usage_count": 0,
+    "created_at": "2026-04-15T10:53:17.400Z",
+    "canvas_json_size": 2700
+  },
+  {
+    "id": 8,
+    "title": "Floral Birthday",
+    "category": "birthday",
+    "status": "published",
+    "thumbnail_color": "#7b3f6e",
+    "is_pro": 0,
+    "usage_count": 0,
+    "created_at": "2026-04-15T10:53:17.400Z",
+    "canvas_json_size": 2165
+  },
+  {
+    "id": 9,
+    "title": "Eid Mubarak",
+    "category": "eid",
+    "status": "published",
+    "thumbnail_color": "#0d4a2e",
+    "is_pro": 0,
+    "usage_count": 0,
+    "created_at": "2026-04-15T10:53:17.400Z",
+    "canvas_json_size": 1890
+  },
+  {
+    "id": 10,
+    "title": "Wedding Anniversary",
+    "category": "anniversary",
+    "status": "published",
+    "thumbnail_color": "#6b0f2b",
+    "is_pro": 0,
+    "usage_count": 0,
+    "created_at": "2026-04-15T10:53:17.400Z",
+    "canvas_json_size": 2177
+  },
+  {
+    "id": 11,
+    "title": "Baby Dedication",
+    "category": "celebration",
+    "status": "published",
+    "thumbnail_color": "#1a4a7a",
+    "is_pro": 0,
+    "usage_count": 0,
+    "created_at": "2026-04-15T10:53:17.400Z",
+    "canvas_json_size": 1958
+  },
+  {
+    "id": 12,
+    "title": "Naming Ceremony",
+    "category": "celebration",
+    "status": "published",
+    "thumbnail_color": "#7a3a00",
+    "is_pro": 0,
+    "usage_count": 0,
+    "created_at": "2026-04-15T10:53:17.400Z",
+    "canvas_json_size": 2052
+  },
+  {
+    "id": 13,
+    "title": "Retirement",
+    "category": "corporate",
+    "status": "published",
+    "thumbnail_color": "#1c3a5c",
+    "is_pro": 0,
+    "usage_count": 0,
+    "created_at": "2026-04-15T10:53:17.400Z",
+    "canvas_json_size": 2154
+  },
+  {
+    "id": 14,
+    "title": "Sports Achievement",
+    "category": "achievement",
+    "status": "published",
+    "thumbnail_color": "#1a1a2e",
+    "is_pro": 0,
+    "usage_count": 0,
+    "created_at": "2026-04-15T10:53:17.400Z",
+    "canvas_json_size": 1657
+  },
+  {
+    "id": 15,
+    "title": "Valentine's Day",
+    "category": "celebration",
+    "status": "published",
+    "thumbnail_color": "#8b0000",
+    "is_pro": 0,
+    "usage_count": 0,
+    "created_at": "2026-04-15T10:53:17.400Z",
+    "canvas_json_size": 1713
+  },
+  {
+    "id": 16,
+    "title": "Mother's Day",
+    "category": "celebration",
+    "status": "published",
+    "thumbnail_color": "#7a2060",
+    "is_pro": 0,
+    "usage_count": 0,
+    "created_at": "2026-04-15T10:53:17.400Z",
+    "canvas_json_size": 1931
+  },
+  {
+    "id": 17,
+    "title": "Father's Day",
+    "category": "celebration",
+    "status": "published",
+    "thumbnail_color": "#0a2a4a",
+    "is_pro": 0,
+    "usage_count": 0,
+    "created_at": "2026-04-15T10:53:17.400Z",
+    "canvas_json_size": 1754
+  },
+  {
+    "id": 18,
+    "title": "Happy New Year",
+    "category": "celebration",
+    "status": "published",
+    "thumbnail_color": "#0a0a1a",
+    "is_pro": 0,
+    "usage_count": 0,
+    "created_at": "2026-04-15T10:53:17.400Z",
+    "canvas_json_size": 1956
+  },
+  {
+    "id": 19,
+    "title": "Merry Christmas",
+    "category": "celebration",
+    "status": "published",
+    "thumbnail_color": "#0d3b1e",
+    "is_pro": 0,
+    "usage_count": 0,
+    "created_at": "2026-04-15T10:53:17.400Z",
+    "canvas_json_size": 1792
+  },
+  {
+    "id": 20,
+    "title": "Congratulations / Promotion",
+    "category": "achievement",
+    "status": "published",
+    "thumbnail_color": "#1a2a1a",
+    "is_pro": 0,
+    "usage_count": 0,
+    "created_at": "2026-04-15T10:53:17.400Z",
+    "canvas_json_size": 2065
+  }
+]

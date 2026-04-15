@@ -145,6 +145,100 @@
   animation: gradient-shift 3.5s ease infinite;
 }
 
+.font-display {
+  font-family: 'Boska', 'Georgia', serif;
+}
+
+.template-preview-royal {
+  background-color: #1a0533;
+}
+
+.template-preview-vibrant {
+  background-color: #FF6B6B;
+}
+
+.template-preview-minimal {
+  background-color: #FAFAF8;
+}
+
+.template-preview-graduation {
+  background-color: #0a1628;
+}
+
+.template-preview-church {
+  background-color: #4a1942;
+}
+
+.template-preview-corporate {
+  background-color: #0f2744;
+}
+
+.template-preview-floral {
+  background-color: #fdf6f0;
+}
+
+.template-preview-ict {
+  background-color: #2a0800;
+}
+
+.template-label-0 {
+  color: #FFD700;
+  opacity: 0.9;
+}
+
+.template-label-1 {
+  color: #FFFFFF;
+  opacity: 0.9;
+}
+
+.template-label-2 {
+  color: #2D2D2D;
+  opacity: 0.9;
+}
+
+.template-label-3 {
+  color: #D4AF37;
+  opacity: 0.9;
+}
+
+.template-label-4 {
+  color: #FFD700;
+  opacity: 0.9;
+}
+
+.template-label-5 {
+  color: #C9A84C;
+  opacity: 0.9;
+}
+
+.template-label-6 {
+  color: #c67ab0;
+  opacity: 0.9;
+}
+
+.template-label-7 {
+  color: #f09820;
+  opacity: 0.9;
+}
+
+.auth-hero-gradient {
+  background: linear-gradient(135deg, #1a0533 0%, #2d0a5e 100%);
+}
+
+.auth-hero-card {
+  background: rgba(255, 215, 0, 0.05);
+}
+
+.font-preview-georgia { font-family: Georgia, serif; }
+.font-preview-arial { font-family: Arial, sans-serif; }
+.font-preview-times { font-family: "Times New Roman", serif; }
+.font-preview-trebuchet { font-family: "Trebuchet MS", sans-serif; }
+.font-preview-verdana { font-family: Verdana, sans-serif; }
+.font-preview-impact { font-family: Impact, sans-serif; }
+.font-preview-great-vibes { font-family: "Great Vibes", cursive; }
+.font-preview-courier { font-family: "Courier New", monospace; }
+.font-preview-default { font-family: var(--font-sans), sans-serif; }
+
 /* ── Canvas dotted background ──────────────────────────────────────────────── */
 .canvas-wrap {
   background-color: hsl(var(--canvas-bg));

@@ -1,0 +1,41 @@
+- generic [ref=e2]:
+  - generic [ref=e260]:
+    - generic [ref=e261]:
+      - link "CardCraft CardCraft" [ref=e262] [cursor=pointer]:
+        - /url: "#/"
+        - generic [ref=e263]:
+          - img "CardCraft" [ref=e264]
+          - generic [ref=e267]: CardCraft
+      - generic [ref=e268]:
+        - heading "Welcome back" [level=1] [ref=e269]
+        - paragraph [ref=e270]: Sign in to access your saved cards.
+        - generic [ref=e271]:
+          - generic [ref=e272]:
+            - text: Email
+            - textbox "Email" [ref=e273]:
+              - /placeholder: you@example.com
+          - generic [ref=e274]:
+            - text: Password
+            - generic [ref=e275]:
+              - textbox "Password" [ref=e276]:
+                - /placeholder: ••••••••
+              - button [ref=e277] [cursor=pointer]:
+                - img [ref=e278]
+          - button "Sign In" [ref=e281] [cursor=pointer]:
+            - img
+            - text: Sign In
+        - paragraph [ref=e282]:
+          - text: Don't have an account?
+          - button "Sign up free" [ref=e283] [cursor=pointer]
+        - link "Forgot your password?" [ref=e285] [cursor=pointer]:
+          - /url: "#/forgot-password"
+          - generic [ref=e286]: Forgot your password?
+        - link "← Continue without account (guest mode)" [ref=e288] [cursor=pointer]:
+          - /url: "#/templates"
+          - generic [ref=e289]: ← Continue without account (guest mode)
+    - generic [ref=e292]:
+      - img [ref=e295]
+      - paragraph [ref=e298]: Save unlimited cards
+      - paragraph [ref=e299]: Registered users can save drafts, reopen designs, and manage all their birthday cards.
+  - region "Notifications (F8)":
+    - list

@@ -23,6 +23,22 @@ import { QRDialog } from "../components/QRDialog";
 
 const FONTS = ["Georgia", "Arial", "Times New Roman", "Trebuchet MS", "Verdana", "Impact", "Great Vibes", "Courier New"];
 
+const FONT_PREVIEW_CLASSES: Record<string, string> = {
+  Georgia: "font-preview-georgia",
+  Arial: "font-preview-arial",
+  "Times New Roman": "font-preview-times",
+  "Trebuchet MS": "font-preview-trebuchet",
+  Verdana: "font-preview-verdana",
+  Impact: "font-preview-impact",
+  "Great Vibes": "font-preview-great-vibes",
+  "Courier New": "font-preview-courier",
+};
+
+const FONT_PREVIEW_CLASS = (font: string) => FONT_PREVIEW_CLASSES[font] || "font-preview-default";
+
+const swatchDataUri = (color: string) =>
+  `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12"><rect width="12" height="12" rx="3" fill="${color}"/></svg>`)}`;
+
 const BG_PRESETS = [
   { label: "Royal Purple", value: "#1a0533" },
   { label: "Midnight Blue", value: "#0a1628" },
@@ -54,8 +70,8 @@ let SRC_W = 800;
 let SRC_H = 1000;
 
 export default function Editor() {
-  const [location] = useLocation();
-  const { user } = useAuth();
+  const [, setLocation] = useLocation();
+  const { user, isPro } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -77,6 +93,7 @@ export default function Editor() {
   const [canRedo, setCanRedo] = useState(false);
   const [exportPreset, setExportPreset] = useState(EXPORT_PRESETS[0]);
   const [isDirty, setIsDirty] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   // ref to track replace-photo input for currently selected image
   const replacePhotoInputRef = useRef<HTMLInputElement>(null);
 
@@ -230,6 +247,16 @@ export default function Editor() {
     const loadJson = (jsonStr: string) => {
       try {
         const data = JSON.parse(jsonStr);
+        
+        // Sanitize canvas data: fix invalid textBaseline values
+        if (data.objects) {
+          data.objects.forEach((obj: any) => {
+            if (obj.textBaseline === "alphabetical") {
+              obj.textBaseline = "alphabetic";
+            }
+          });
+        }
+        
         // Read canvas dimensions from template (default 800x1000 portrait)
         const srcW = data.canvasWidth || 800;
         const srcH = data.canvasHeight || 1000;
@@ -448,6 +475,10 @@ export default function Editor() {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, isLogo = false) => {
     const file = e.target.files?.[0];
     if (!file || !fabricRef.current) return;
+    
+    setIsUploading(true);
+    const toastId = toast({ title: "Adding image...", description: "Please wait.", duration: 2000 });
+    
     const f = (window as any).fabric;
     const canvas = fabricRef.current;
     const reader = new FileReader();
@@ -469,11 +500,12 @@ export default function Editor() {
         })();
 
         if (frameObj) {
+          const frameType = frameObj.customType || (isLogo ? "logo" : "photo_frame");
+          
           // ── Frame dimensions in canvas coordinates ──
-          const fw = (frameObj.width  || 100) * (frameObj.scaleX || 1);
-          const fh = (frameObj.height || frameObj.radius ? (frameObj.radius! * 2) : 100) * (frameObj.scaleY || 1);
-          const fx = frameObj.left || 0;
-          const fy = frameObj.top  || 0;
+          const center = frameObj.getCenterPoint();
+          const fw = frameObj.getScaledWidth();
+          const fh = frameObj.getScaledHeight();
           const frameAngle = frameObj.angle || 0;
 
           // Cover-fit: scale image so it fills the frame (like CSS background-size: cover)
@@ -481,57 +513,65 @@ export default function Editor() {
           const scaleY = fh / img.height;
           const scale  = Math.max(scaleX, scaleY);
 
-          const scaledW = img.width  * scale;
-          const scaledH = img.height * scale;
-
-          // Center the image within the frame
-          const offsetX = (scaledW - fw) / 2;
-          const offsetY = (scaledH - fh) / 2;
-
           const fabricImg = new f.Image(img, {
-            left: fx - offsetX / scale,
-            top:  fy - offsetY / scale,
+            originX: 'center',
+            originY: 'center',
+            left: center.x,
+            top: center.y,
             scaleX: scale,
             scaleY: scale,
             angle: frameAngle,
-            customType: isLogo ? "logo_image" : "photo_image",
+            customType: frameType,
           });
 
           // ── Apply clip path matching the frame's shape ──
-          if (frameObj.type === "circle" || (frameObj.rx && frameObj.rx >= (Math.min(frameObj.width || 100, frameObj.height || 100) / 2) * 0.9)) {
+          const isCircle = frameObj.type === "circle" || (frameObj.rx && frameObj.rx >= (Math.min(frameObj.width || 100, frameObj.height || 100) / 2) * 0.9);
+          
+          if (isCircle) {
             // Circular frame → circular clip
-            const clipR = Math.min(fw, fh) / 2 / scale;
             fabricImg.clipPath = new f.Circle({
-              radius: clipR,
-              left:  -clipR + offsetX / scale,
-              top:   -clipR + offsetY / scale,
+              originX: 'center',
+              originY: 'center',
+              radius: Math.min(fw, fh) / 2 / scale,
+              left: 0,
+              top: 0,
               absolutePositioned: false,
             });
           } else if (frameObj.rx && frameObj.rx > 4) {
             // Rounded rect frame → rounded clip
             const clipRx = (frameObj.rx * (frameObj.scaleX || 1)) / scale;
+            const clipRy = (frameObj.ry * (frameObj.scaleY || 1)) / scale;
             fabricImg.clipPath = new f.Rect({
+              originX: 'center',
+              originY: 'center',
               width:  fw / scale,
               height: fh / scale,
-              rx: clipRx, ry: clipRx,
-              left:  offsetX / scale,
-              top:   offsetY / scale,
+              rx: clipRx, ry: clipRy,
+              left: 0,
+              top: 0,
               absolutePositioned: false,
             });
           } else {
             // Plain rect frame → rect clip
             fabricImg.clipPath = new f.Rect({
+              originX: 'center',
+              originY: 'center',
               width:  fw / scale,
               height: fh / scale,
-              left:  offsetX / scale,
-              top:   offsetY / scale,
+              left: 0,
+              top: 0,
               absolutePositioned: false,
             });
           }
 
-          // Place image just above the frame in the layer stack
+          // Replace the frame completely with the newly cropped image
+          const frameIndex = canvas.getObjects().indexOf(frameObj);
           canvas.remove(frameObj);
           canvas.add(fabricImg);
+          
+          if (frameIndex >= 0 && typeof (fabricImg as any).moveTo === "function") {
+            (fabricImg as any).moveTo(frameIndex);
+          }
           canvas.setActiveObject(fabricImg);
         } else {
           // ── No frame found — free placement ──
@@ -545,8 +585,21 @@ export default function Editor() {
           canvas.setActiveObject(fabricImg);
         }
         canvas.renderAll();
+        saveHistory();
+        setIsDirty(true);
+        setIsUploading(false);
       };
+      
+      img.onerror = () => {
+        setIsUploading(false);
+        toast({ title: "Error", description: "Failed to load image. Please try another.", variant: "destructive" });
+      };
+      
       img.src = ev.target?.result as string;
+    };
+    reader.onerror = () => {
+      setIsUploading(false);
+      toast({ title: "Error", description: "Failed to read file.", variant: "destructive" });
     };
     reader.readAsDataURL(file);
     e.target.value = "";
@@ -710,19 +763,98 @@ export default function Editor() {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  // ─── Guest save handoff ───────────────────────────────────────────────────
+  const savePendingAndAuth = () => {
+    const canvas = fabricRef.current;
+    if (!canvas) {
+      setLocation("/auth");
+      return;
+    }
+
+    try {
+      const currentZoom = canvas.getZoom();
+      canvas.setZoom(1);
+      const objects = canvas.getObjects().map((o: any) =>
+        o.toJSON(["customType", "editable", "movable", "resizable", "styleEditable", "locked"])
+      );
+      const designJson = JSON.stringify({ objects, background: canvas.backgroundColor });
+      canvas.setZoom(currentZoom);
+
+      sessionStorage.setItem("pendingDesign", JSON.stringify({
+        title: projectTitle,
+        designJson,
+        templateId: template?.id ?? null,
+      }));
+
+      toast({ title: "Design saved", description: "Sign in to save this card to your projects." });
+    } catch {
+      // If serializing fails, still allow auth flow.
+    }
+
+    setLocation("/auth");
+  };
+
   // ─── Export ───────────────────────────────────────────────────────────────
-  const exportCard = (format: "png" | "jpeg") => {
+  const exportCard = async (format: "png" | "jpeg") => {
     const canvas = fabricRef.current;
     if (!canvas) return;
+
+    // Enforce backend download policy (free tier daily limits).
+    try {
+      const trackRes = await apiRequest("POST", "/api/downloads/track");
+      const trackData = await trackRes.json();
+      if (trackData && trackData.allowed === false) {
+        toast({
+          title: "Daily limit reached",
+          description: "Free accounts can download 3 cards per day. Upgrade to Pro for unlimited downloads.",
+          variant: "destructive",
+        });
+        return;
+      }
+    } catch {
+      // Fail open on transient network issues so export is still possible.
+    }
+
     const currentZoom = canvas.getZoom();
+    const f = (window as any).fabric;
     canvas.setZoom(1);
+
+    // Apply watermark to non-Pro exports for consistent policy enforcement.
+    let wm: any = null;
+    if (!isPro && f?.Text) {
+      wm = new f.Text("CardCraft", {
+        left: canvas.width - 8,
+        top: canvas.height - 8,
+        originX: "right",
+        originY: "bottom",
+        fontSize: Math.round(canvas.width * 0.025),
+        fontFamily: "Arial",
+        fill: "rgba(255,255,255,0.35)",
+        selectable: false,
+        evented: false,
+      });
+      canvas.add(wm);
+      canvas.renderAll();
+    }
+
     const dataURL = canvas.toDataURL({ format, quality: 0.95, multiplier: exportPreset.multiplier });
+
+    if (wm) {
+      canvas.remove(wm);
+      canvas.renderAll();
+    }
+
     canvas.setZoom(currentZoom);
     const a = document.createElement("a");
     a.href = dataURL;
     a.download = `${projectTitle.replace(/\s+/g, "-")}-${exportPreset.label.split(" ")[0].toLowerCase()}.${format === "jpeg" ? "jpg" : "png"}`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    toast({ title: "Downloaded!", description: `${exportPreset.label} exported as ${format.toUpperCase()}.` });
+
+    const remaining = user && !isPro
+      ? `${Math.max(0, 3 - ((user.downloadsToday || 0) + 1))} free downloads remaining today`
+      : `${exportPreset.label} exported as ${format.toUpperCase()}.`;
+
+    toast({ title: "Downloaded!", description: remaining });
   };
 
   // ─── Layers list ──────────────────────────────────────────────────────────
@@ -772,16 +904,18 @@ export default function Editor() {
       <header className="flex items-center justify-between px-3 sm:px-4 h-12 border-b border-border bg-card flex-shrink-0 z-30">
         <div className="flex items-center gap-1.5">
           <Link href="/templates">
-            <a className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors text-sm p-1.5 rounded-md hover:bg-secondary" data-testid="button-back">
+            <div className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors text-sm p-1.5 rounded-md hover:bg-secondary" data-testid="button-back">
               <ArrowLeft size={15} />
               <span className="hidden sm:inline">Templates</span>
-            </a>
+            </div>
           </Link>
           <div className="w-px h-4 bg-border hidden sm:block" />
           <input
             className="bg-transparent text-sm font-medium focus:outline-none w-32 sm:w-48 truncate"
             value={projectTitle}
             onChange={e => setProjectTitle(e.target.value)}
+            aria-label="Project title"
+            title="Project title"
             data-testid="input-project-title"
           />
         </div>
@@ -795,11 +929,11 @@ export default function Editor() {
             <Redo2 size={14} />
           </button>
           <div className="w-px h-4 bg-border mx-1" />
-          <button onClick={() => zoomTo(Math.max(30, zoomLevel - 25))} className="p-1.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground">
+          <button onClick={() => zoomTo(Math.max(30, zoomLevel - 25))} title="Zoom out" className="p-1.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground">
             <ZoomOut size={14} />
           </button>
           <span className="text-xs text-muted-foreground w-10 text-center">{zoomLevel}%</span>
-          <button onClick={() => zoomTo(Math.min(300, zoomLevel + 25))} className="p-1.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground">
+          <button onClick={() => zoomTo(Math.min(300, zoomLevel + 25))} title="Zoom in" className="p-1.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground">
             <ZoomIn size={14} />
           </button>
           <button onClick={fitCanvas} title="Fit to view" className="p-1.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground">
@@ -820,11 +954,9 @@ export default function Editor() {
               <Save size={13} /> {saveProject.isPending ? "Saving..." : isDirty ? "Save*" : "Saved"}
             </Button>
           ) : (
-            <Link href="/auth">
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs h-8">
-                <Save size={13} /> Save
-              </Button>
-            </Link>
+            <Button size="sm" variant="outline" className="gap-1.5 text-xs h-8" onClick={savePendingAndAuth}>
+              <Save size={13} /> Save
+            </Button>
           )}
         </div>
       </header>
@@ -856,13 +988,13 @@ export default function Editor() {
             <button onClick={addText} className="w-full text-left text-xs px-3 py-2 rounded bg-secondary hover:bg-secondary/70 flex items-center gap-2" data-testid="button-add-text">
               <Type size={12} /> Add Text
             </button>
-            <label className="w-full text-xs px-3 py-2 rounded bg-secondary hover:bg-secondary/70 flex items-center gap-2 cursor-pointer">
-              <ImageIcon size={12} /> Add Photo
-              <input type="file" accept="image/*" className="hidden" onChange={e => handleImageUpload(e)} data-testid="input-photo-upload" />
+            <label className={`w-full text-xs px-3 py-2 rounded flex items-center gap-2 cursor-pointer ${isUploading ? 'bg-secondary/50 opacity-50' : 'bg-secondary hover:bg-secondary/70'}`}>
+              <ImageIcon size={12} /> {isUploading ? 'Uploading...' : 'Add Photo'}
+              <input type="file" accept="image/*" className="hidden" disabled={isUploading} onChange={e => handleImageUpload(e)} data-testid="input-photo-upload" />
             </label>
-            <label className="w-full text-xs px-3 py-2 rounded bg-secondary hover:bg-secondary/70 flex items-center gap-2 cursor-pointer">
-              <Upload size={12} /> Add Logo
-              <input type="file" accept="image/*" className="hidden" onChange={e => handleImageUpload(e, true)} data-testid="input-logo-upload" />
+            <label className={`w-full text-xs px-3 py-2 rounded flex items-center gap-2 cursor-pointer ${isUploading ? 'bg-secondary/50 opacity-50' : 'bg-secondary hover:bg-secondary/70'}`}>
+              <Upload size={12} /> {isUploading ? 'Uploading...' : 'Add Logo'}
+              <input type="file" accept="image/*" className="hidden" disabled={isUploading} onChange={e => handleImageUpload(e, true)} data-testid="input-logo-upload" />
             </label>
             <button onClick={() => addShape("rect")} className="w-full text-left text-xs px-3 py-2 rounded bg-secondary hover:bg-secondary/70 flex items-center gap-2">
               <Palette size={12} /> Rectangle
@@ -960,7 +1092,7 @@ export default function Editor() {
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Fill Color</Label>
                       <div className="flex items-center gap-2">
-                        <input type="color" value={fillColor.startsWith("#") ? fillColor : "#FFFFFF"}
+                        <input type="color" value={fillColor.startsWith("#") ? fillColor : "#FFFFFF"} aria-label="Fill color" title="Fill color"
                           onChange={e => updateSelectedProp("fill", e.target.value)}
                           className="w-8 h-8 rounded cursor-pointer border border-border bg-transparent" data-testid="input-fill-color" />
                         <span className="text-xs text-muted-foreground">{fillColor}</span>
@@ -1033,7 +1165,9 @@ export default function Editor() {
                   {BG_PRESETS.map(bg => (
                     <button key={bg.value} onClick={() => setBg(bg.value)} title={bg.label}
                       className="w-full aspect-square rounded-md border border-border hover:scale-110 transition-transform"
-                      style={{ background: bg.value }} data-testid={`button-bg-${bg.label.replace(/\s+/g, "-").toLowerCase()}`} />
+                      data-testid={`button-bg-${bg.label.replace(/\s+/g, "-").toLowerCase()}`}>
+                      <img alt="" aria-hidden="true" src={swatchDataUri(bg.value)} className="w-full h-full rounded-md object-cover" />
+                    </button>
                   ))}
                 </div>
                 <div className="flex items-center gap-2">
@@ -1056,7 +1190,7 @@ export default function Editor() {
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Text Content</Label>
                     <textarea className="w-full bg-input text-xs p-2 rounded border border-border focus:outline-none focus:ring-1 focus:ring-ring resize-none"
-                      rows={3} value={textValue} onChange={e => updateSelectedProp("text", e.target.value)} data-testid="textarea-text-content" />
+                      rows={3} placeholder="Edit text" value={textValue} onChange={e => updateSelectedProp("text", e.target.value)} data-testid="textarea-text-content" />
                   </div>
 
                   <div className="space-y-1">
@@ -1064,13 +1198,13 @@ export default function Editor() {
                     <Select value={fontFamily} onValueChange={v => updateSelectedProp("fontFamily", v)}>
                       <SelectTrigger className="h-8 text-xs" data-testid="select-font-family">
                         <SelectValue>
-                          <span style={{ fontFamily }}>{fontFamily}</span>
+                          <span className={FONT_PREVIEW_CLASS(fontFamily)}>{fontFamily}</span>
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {FONTS.map(f => (
                           <SelectItem key={f} value={f}>
-                            <span style={{ fontFamily: f }}>{f}</span>
+                            <span className={FONT_PREVIEW_CLASS(f)}>{f}</span>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1084,7 +1218,7 @@ export default function Editor() {
 
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Text Color</Label>
-                    <input type="color" value={textColor.startsWith("#") ? textColor : "#FFFFFF"}
+                    <input type="color" value={textColor.startsWith("#") ? textColor : "#FFFFFF"} aria-label="Text color" title="Text color"
                       onChange={e => updateSelectedProp("fill", e.target.value)}
                       className="w-8 h-8 rounded cursor-pointer border border-border bg-transparent" data-testid="input-text-color" />
                   </div>
@@ -1099,13 +1233,13 @@ export default function Editor() {
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Style & Alignment</Label>
                     <div className="flex items-center gap-1 flex-wrap">
-                      <button onClick={() => updateSelectedProp("fontWeight", isBold ? "normal" : "bold")}
+                      <button onClick={() => updateSelectedProp("fontWeight", isBold ? "normal" : "bold")} title="Bold"
                         className={`p-1.5 rounded border text-xs ${isBold ? "bg-primary text-primary-foreground border-primary" : "bg-secondary border-border"}`} data-testid="button-bold"><Bold size={12} /></button>
-                      <button onClick={() => updateSelectedProp("fontStyle", isItalic ? "normal" : "italic")}
+                      <button onClick={() => updateSelectedProp("fontStyle", isItalic ? "normal" : "italic")} title="Italic"
                         className={`p-1.5 rounded border text-xs ${isItalic ? "bg-primary text-primary-foreground border-primary" : "bg-secondary border-border"}`} data-testid="button-italic"><Italic size={12} /></button>
-                      <button onClick={() => updateSelectedProp("textAlign", "left")} className={`p-1.5 rounded border ${textAlign === "left" ? "bg-primary text-primary-foreground border-primary" : "bg-secondary border-border"}`}><AlignLeft size={12} /></button>
-                      <button onClick={() => updateSelectedProp("textAlign", "center")} className={`p-1.5 rounded border ${textAlign === "center" ? "bg-primary text-primary-foreground border-primary" : "bg-secondary border-border"}`}><AlignCenter size={12} /></button>
-                      <button onClick={() => updateSelectedProp("textAlign", "right")} className={`p-1.5 rounded border ${textAlign === "right" ? "bg-primary text-primary-foreground border-primary" : "bg-secondary border-border"}`}><AlignRight size={12} /></button>
+                      <button onClick={() => updateSelectedProp("textAlign", "left")} title="Align left" className={`p-1.5 rounded border ${textAlign === "left" ? "bg-primary text-primary-foreground border-primary" : "bg-secondary border-border"}`}><AlignLeft size={12} /></button>
+                      <button onClick={() => updateSelectedProp("textAlign", "center")} title="Align center" className={`p-1.5 rounded border ${textAlign === "center" ? "bg-primary text-primary-foreground border-primary" : "bg-secondary border-border"}`}><AlignCenter size={12} /></button>
+                      <button onClick={() => updateSelectedProp("textAlign", "right")} title="Align right" className={`p-1.5 rounded border ${textAlign === "right" ? "bg-primary text-primary-foreground border-primary" : "bg-secondary border-border"}`}><AlignRight size={12} /></button>
                     </div>
                   </div>
 
@@ -1154,8 +1288,7 @@ export default function Editor() {
         <div className="fixed inset-0 z-50 lg:hidden" onClick={() => setMobilePanel(null)}>
           <div className="absolute inset-0 bg-black/60" />
           <div
-            className="absolute bottom-0 left-0 right-0 bg-card border-t border-border rounded-t-2xl flex flex-col"
-            style={{ maxHeight: "75vh" }}
+            className="absolute bottom-0 left-0 right-0 bg-card border-t border-border rounded-t-2xl flex flex-col max-h-[75vh]"
             onClick={e => e.stopPropagation()}
           >
             {/* Drag handle */}
@@ -1164,7 +1297,7 @@ export default function Editor() {
             </div>
             <div className="flex items-center justify-between px-4 py-2 flex-shrink-0 border-b border-border">
               <h3 className="font-semibold text-sm capitalize">{mobilePanel}</h3>
-              <button onClick={() => setMobilePanel(null)} className="p-1.5 rounded-full hover:bg-secondary"><X size={16} /></button>
+              <button onClick={() => setMobilePanel(null)} title="Close panel" className="p-1.5 rounded-full hover:bg-secondary"><X size={16} /></button>
             </div>
             <div className="overflow-y-auto flex-1 p-4">
 
@@ -1173,7 +1306,7 @@ export default function Editor() {
                 {isText && (
                   <div className="space-y-2">
                     <Label className="text-xs">Text Content</Label>
-                    <textarea className="w-full bg-input text-xs p-2 rounded border border-border focus:outline-none resize-none" rows={2}
+                    <textarea className="w-full bg-input text-xs p-2 rounded border border-border focus:outline-none resize-none" rows={2} placeholder="Edit text"
                       value={textValue} onChange={e => updateSelectedProp("text", e.target.value)} />
                     <div className="flex gap-2">
                       <div className="flex-1">
@@ -1183,7 +1316,7 @@ export default function Editor() {
                     </div>
                     <div className="flex gap-2 items-center">
                       <Label className="text-xs">Color:</Label>
-                      <input type="color" value={textColor.startsWith("#") ? textColor : "#fff"}
+                      <input type="color" value={textColor.startsWith("#") ? textColor : "#fff"} aria-label="Text color" title="Text color"
                         onChange={e => updateSelectedProp("fill", e.target.value)}
                         className="w-8 h-8 rounded cursor-pointer border border-border" />
                     </div>
@@ -1193,9 +1326,10 @@ export default function Editor() {
                   <Label className="text-xs block mb-2">Background</Label>
                   <div className="grid grid-cols-6 gap-1.5">
                     {BG_PRESETS.map(bg => (
-                      <button key={bg.value} onClick={() => { setBg(bg.value); setMobilePanel(null); }}
-                        className="w-full aspect-square rounded border border-border hover:scale-110 transition-transform"
-                        style={{ background: bg.value }} />
+                      <button key={bg.value} onClick={() => { setBg(bg.value); setMobilePanel(null); }} title={bg.label}
+                        className="w-full aspect-square rounded border border-border hover:scale-110 transition-transform overflow-hidden">
+                          <img alt="" aria-hidden="true" src={swatchDataUri(bg.value)} className="w-full h-full object-cover" />
+                        </button>
                     ))}
                   </div>
                 </div>

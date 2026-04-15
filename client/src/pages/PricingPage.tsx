@@ -114,7 +114,7 @@ export default function PricingPage() {
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/15 border border-primary/30 text-xs font-medium text-gold mb-4">
             <Sparkles size={11} /> Simple, honest pricing
           </div>
-          <h1 className="text-3xl sm:text-4xl font-bold mb-3" style={{ fontFamily: "'Boska', Georgia, serif" }}>
+          <h1 className="text-3xl sm:text-4xl font-bold mb-3 font-display">
             Pay once. Use forever.
           </h1>
           <p className="text-muted-foreground max-w-md mx-auto">
@@ -194,7 +194,7 @@ export default function PricingPage() {
 
             {!user && (
               <p className="text-center text-xs text-muted-foreground mt-3">
-                <Link href="/auth"><a className="text-primary hover:underline">Sign in</a></Link> to pay
+                <Link href="/auth" className="text-primary hover:underline">Sign in</Link> to pay
               </p>
             )}
           </div>

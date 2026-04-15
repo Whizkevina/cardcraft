@@ -1,0 +1,29 @@
+{
+  "first_object": {
+    "type": "rect",
+    "left": 0,
+    "top": 0,
+    "width": 800,
+    "height": 1000,
+    "fill": "#1a0533",
+    "selectable": false,
+    "evented": false,
+    "customType": "background",
+    "locked": true
+  },
+  "text_object_sample": {
+    "type": "text",
+    "text": "Happy Birthday",
+    "left": 400,
+    "top": 430,
+    "fontSize": 42,
+    "fontFamily": "Georgia",
+    "fill": "#FFD700",
+    "textAlign": "center",
+    "originX": "center",
+    "customType": "greeting",
+    "editable": true,
+    "movable": true,
+    "styleEditable": true
+  }
+}

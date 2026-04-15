@@ -1,6 +1,8 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-const API_BASE = "__PORT_5000__".startsWith("__") ? "" : "__PORT_5000__";
+// In development, point to Express backend on port 5000
+// In production, use relative URLs (same domain)
+const API_BASE = process.env.NODE_ENV === "production" ? "" : "http://127.0.0.1:5000";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -14,14 +16,23 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(`${API_BASE}${url}`, {
-    method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
-  });
+  const fullUrl = `${API_BASE}${url}`;
+  console.log(`[apiRequest] ${method} ${fullUrl}`, data ? `with data: ${JSON.stringify(data).slice(0, 50)}...` : "");
+  
+  try {
+    const res = await fetch(fullUrl, {
+      method,
+      headers: data ? { "Content-Type": "application/json" } : {},
+      body: data ? JSON.stringify(data) : undefined,
+    });
 
-  await throwIfResNotOk(res);
-  return res;
+    console.log(`[apiRequest] Response status: ${res.status} ${res.statusText}`);
+    await throwIfResNotOk(res);
+    return res;
+  } catch (err) {
+    console.error(`[apiRequest] Error on ${method} ${fullUrl}:`, err);
+    throw err;
+  }
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";

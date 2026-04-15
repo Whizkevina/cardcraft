@@ -36,7 +36,7 @@ export default function AccountSettings() {
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newPw !== confirmPw) { toast({ title: "Passwords don't match", variant: "destructive" }); return; }
-    if (newPw.length < 6) { toast({ title: "Password too short", description: "At least 6 characters required.", variant: "destructive" }); return; }
+    if (newPw.length < 8) { toast({ title: "Password too short", description: "At least 8 characters required.", variant: "destructive" }); return; }
     setChangingPw(true);
     try {
       const res = await apiRequest("POST", "/api/auth/change-password", { currentPassword: currentPw, newPassword: newPw });
@@ -53,7 +53,7 @@ export default function AccountSettings() {
       <Navbar />
       <main className="max-w-2xl mx-auto px-4 sm:px-6 py-10 space-y-6">
         <div>
-          <h1 className="text-2xl font-bold mb-1" style={{ fontFamily: "'Boska', Georgia, serif" }}>Account Settings</h1>
+          <h1 className="text-2xl font-bold mb-1 font-display">Account Settings</h1>
           <p className="text-muted-foreground text-sm">Manage your profile, password, and subscription.</p>
         </div>
 
@@ -89,7 +89,7 @@ export default function AccountSettings() {
         </div>
 
         {/* Subscription */}
-        <div className={`rounded-xl p-6 border ${isPro ? "bg-primary/8 border-primary/25" : "bg-card border-border"}`}>
+        <div className={`rounded-xl p-6 border ${isPro ? "bg-card border-primary/25 shadow-sm" : "bg-card border-border"}`}>
           <div className="flex items-center gap-3 mb-3">
             <Sparkles size={16} className="text-gold" />
             <h2 className="font-semibold">Subscription</h2>
@@ -145,7 +145,7 @@ export default function AccountSettings() {
             <div className="space-y-1.5">
               <Label className="text-sm">New Password</Label>
               <Input type="password" value={newPw} onChange={e => setNewPw(e.target.value)}
-                placeholder="At least 6 characters" required minLength={6} className="h-10" data-testid="input-new-password" />
+                placeholder="At least 8 characters" required minLength={8} className="h-10" data-testid="input-new-password" />
             </div>
             <div className="space-y-1.5">
               <Label className="text-sm">Confirm New Password</Label>

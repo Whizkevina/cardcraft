@@ -81,14 +81,12 @@ export default {
           busy: "rgb(239 68 68)",
           offline: "rgb(156 163 175)",
         },
+        gold: "hsl(var(--gold) / <alpha-value>)",
       },
       fontFamily: {
         sans: ["'Plus Jakarta Sans'", "var(--font-sans)", "sans-serif"],
         serif: ["'Boska'", "Georgia", "serif"],
         mono: ["var(--font-mono)"],
-      },
-      colors: {
-        gold: "hsl(var(--gold) / <alpha-value>)",
       },
       keyframes: {
         "accordion-down": {

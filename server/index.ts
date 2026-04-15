@@ -1,13 +1,32 @@
+import dotenv from "dotenv";
+import path from "path";
+
+dotenv.config({ path: path.resolve(".env.local") });
+
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import helmet from "helmet";
+import cors from "cors";
 
 const app = express();
 const httpServer = createServer(app);
 
 const isProd = process.env.NODE_ENV === "production";
+
+// ─── CORS (development only) ──────────────────────────────────────────────────
+if (!isProd) {
+  app.use(cors({
+    origin: ["http://localhost:5173", "http://127.0.0.1:5173"],
+    credentials: true,
+  }));
+}
+
+// Required for secure cookies behind reverse proxies (Render/Railway/Nginx).
+if (isProd) {
+  app.set("trust proxy", 1);
+}
 
 // ─── Security headers ─────────────────────────────────────────────────────────
 app.use(
@@ -24,7 +43,7 @@ app.use(
         styleSrc: ["'self'", "'unsafe-inline'", "https://api.fontshare.com", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://api.fontshare.com", "https://fonts.gstatic.com"],
         imgSrc: ["'self'", "data:", "blob:", "https:"],
-        connectSrc: ["'self'", "https://api.paystack.co", "https://cdnjs.cloudflare.com"],
+        connectSrc: ["'self'", "http://127.0.0.1:5000", "https://api.paystack.co", "https://cdnjs.cloudflare.com"],
         frameSrc: ["'self'", "https://checkout.paystack.com"],
         objectSrc: ["'none'"],
         baseUri: ["'self'"],
@@ -94,7 +113,12 @@ app.use((req, res, next) => {
   }
 
   const port = parseInt(process.env.PORT || "5000", 10);
-  httpServer.listen({ port, host: "0.0.0.0", reusePort: true }, () => {
-    log(`serving on port ${port}`);
+  const host = process.env.HOST || (process.platform === "win32" ? "127.0.0.1" : "0.0.0.0");
+  const listenOptions: any = { port, host };
+  if (process.platform !== "win32") {
+    listenOptions.reusePort = true;
+  }
+  httpServer.listen(listenOptions, () => {
+    log(`serving on http://${host}:${port}`);
   });
 })();

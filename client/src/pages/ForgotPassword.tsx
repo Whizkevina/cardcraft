@@ -51,15 +51,13 @@ export default function ForgotPassword() {
   };
 
   const Logo = () => (
-    <Link href="/">
-      <a className="flex items-center gap-2 mb-8 justify-center">
+    <Link href="/" className="flex items-center gap-2 mb-8 justify-center hover:opacity-80 transition-opacity">
         <svg aria-label="CardCraft" viewBox="0 0 32 32" fill="none" className="w-8 h-8">
           <rect width="32" height="32" rx="8" fill="hsl(43 96% 58%)"/>
           <rect x="6" y="8" width="20" height="16" rx="3" fill="none" stroke="hsl(240 20% 7%)" strokeWidth="2"/>
           <path d="M6 14h20" stroke="hsl(240 20% 7%)" strokeWidth="1.5"/>
         </svg>
         <span className="text-xl font-bold logo-text">CardCraft</span>
-      </a>
     </Link>
   );
 
@@ -82,13 +80,13 @@ export default function ForgotPassword() {
             <>
               <div className="flex items-center gap-2 mb-6 justify-center">
                 <KeyRound size={20} className="text-gold" />
-                <h1 className="text-2xl font-bold" style={{ fontFamily: "'Boska', Georgia, serif" }}>Set new password</h1>
+                <h1 className="text-2xl font-bold font-display">Set new password</h1>
               </div>
               <form onSubmit={handleReset} className="space-y-4">
                 <div className="space-y-1.5">
                   <Label>New Password</Label>
                   <Input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)}
-                    placeholder="At least 6 characters" required minLength={6} className="h-10" />
+                    placeholder="At least 8 characters" required minLength={8} className="h-10" />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Confirm Password</Label>
@@ -121,15 +119,13 @@ export default function ForgotPassword() {
               If <strong>{email}</strong> is registered, you'll receive a password reset link within a few minutes.
             </p>
             <p className="text-xs text-muted-foreground">Didn't get it? Check your spam folder.</p>
-            <Link href="/auth">
-              <a className="flex items-center gap-1.5 justify-center text-sm text-primary hover:underline">
+            <Link href="/auth" className="flex items-center gap-1.5 justify-center text-sm text-primary hover:underline">
                 <ArrowLeft size={14} /> Back to Sign In
-              </a>
             </Link>
           </div>
         ) : (
           <>
-            <h1 className="text-2xl font-bold mb-1 text-center" style={{ fontFamily: "'Boska', Georgia, serif" }}>
+            <h1 className="text-2xl font-bold mb-1 text-center font-display">
               Forgot password?
             </h1>
             <p className="text-muted-foreground text-sm text-center mb-6">
@@ -145,10 +141,8 @@ export default function ForgotPassword() {
                 {loading ? "Sending..." : "Send Reset Link"}
               </Button>
             </form>
-            <Link href="/auth">
-              <a className="flex items-center gap-1.5 justify-center mt-5 text-sm text-muted-foreground hover:text-foreground">
+            <Link href="/auth" className="flex items-center gap-1.5 justify-center mt-5 text-sm text-muted-foreground hover:text-foreground">
                 <ArrowLeft size={14} /> Back to Sign In
-              </a>
             </Link>
           </>
         )}

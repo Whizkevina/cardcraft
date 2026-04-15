@@ -41,19 +41,17 @@ export default function AuthPage() {
     <div className="min-h-screen flex">
       {/* Left: form */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
-        <Link href="/">
-          <a className="flex items-center gap-2 mb-8">
-            <svg aria-label="CardCraft" viewBox="0 0 32 32" fill="none" className="w-8 h-8">
-              <rect width="32" height="32" rx="8" fill="hsl(43 96% 58%)"/>
-              <rect x="6" y="8" width="20" height="16" rx="3" fill="none" stroke="hsl(240 20% 7%)" strokeWidth="2"/>
-              <path d="M6 14h20" stroke="hsl(240 20% 7%)" strokeWidth="1.5"/>
-            </svg>
-            <span className="text-xl font-bold logo-text">CardCraft</span>
-          </a>
+        <Link href="/" className="flex items-center gap-2 mb-8 hover:opacity-80 transition-opacity">
+          <svg aria-label="CardCraft" viewBox="0 0 32 32" fill="none" className="w-8 h-8">
+            <rect width="32" height="32" rx="8" fill="hsl(43 96% 58%)"/>
+            <rect x="6" y="8" width="20" height="16" rx="3" fill="none" stroke="hsl(240 20% 7%)" strokeWidth="2"/>
+            <path d="M6 14h20" stroke="hsl(240 20% 7%)" strokeWidth="1.5"/>
+          </svg>
+          <span className="text-xl font-bold logo-text">CardCraft</span>
         </Link>
 
         <div className="w-full max-w-sm">
-          <h1 className="text-2xl font-bold mb-1" style={{ fontFamily: "'Boska', Georgia, serif" }}>
+          <h1 className="text-2xl font-bold mb-1 font-display">
             {mode === "login" ? "Welcome back" : "Create account"}
           </h1>
           <p className="text-muted-foreground text-sm mb-6">
@@ -120,18 +118,14 @@ export default function AuthPage() {
 
           {mode === "login" && (
             <div className="pt-2">
-              <Link href="/forgot-password">
-                <a className="text-xs text-muted-foreground hover:text-primary transition-colors block text-center">
+              <Link href="/forgot-password" className="text-xs text-muted-foreground hover:text-primary transition-colors block text-center">
                   Forgot your password?
-                </a>
               </Link>
             </div>
           )}
           <div className="mt-4 pt-4 border-t border-border">
-            <Link href="/templates">
-              <a className="text-xs text-muted-foreground hover:text-foreground text-center block">
+            <Link href="/templates" className="text-xs text-muted-foreground hover:text-foreground text-center block transition-colors">
                 ← Continue without account (guest mode)
-              </a>
             </Link>
           </div>
         </div>
@@ -139,9 +133,9 @@ export default function AuthPage() {
 
       {/* Right: decorative */}
       <div className="hidden md:flex flex-1 items-center justify-center bg-secondary relative overflow-hidden">
-        <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #1a0533 0%, #2d0a5e 100%)" }} />
+        <div className="absolute inset-0 auth-hero-gradient" />
         <div className="relative z-10 text-center p-10">
-          <div className="w-32 h-40 mx-auto rounded-2xl border-2 border-yellow-400/50 mb-6 flex items-center justify-center" style={{ background: "rgba(255,215,0,0.05)" }}>
+          <div className="w-32 h-40 mx-auto rounded-2xl border-2 border-yellow-400/50 mb-6 flex items-center justify-center auth-hero-card">
             <div className="text-yellow-400 opacity-50">
               <svg viewBox="0 0 24 24" fill="none" className="w-12 h-12">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="1.5"/>
