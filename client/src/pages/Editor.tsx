@@ -478,6 +478,25 @@ export default function Editor() {
     fabricRef.current.add(obj);
     fabricRef.current.setActiveObject(obj);
     fabricRef.current.renderAll();
+    saveHistory();
+  };
+
+  const addEmoji = (emoji: string) => {
+    const f = (window as any).fabric;
+    if (!f || !fabricRef.current) return;
+    
+    const text = new f.Text(emoji, { 
+      left: 100, 
+      top: 180, 
+      fontSize: 80,
+      fontFamily: "Arial, sans-serif",
+      textAlign: "center"
+    });
+    
+    fabricRef.current.add(text);
+    fabricRef.current.setActiveObject(text);
+    fabricRef.current.renderAll();
+    saveHistory();
   };
 
   const setBg = (val: string, type: "color" | "gradient" = "color") => {
@@ -1049,6 +1068,16 @@ export default function Editor() {
             <button onClick={() => addShape("star")} className="w-full text-left text-xs px-3 py-2 rounded bg-secondary hover:bg-secondary/70 flex items-center gap-2">
               <Palette size={12} /> Star (Sticker)
             </button>
+            <div className="pt-2 border-t border-border mt-2">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-2">Emojis</p>
+              <div className="grid grid-cols-5 gap-1">
+                {["❤️", "✨", "🎉", "🔥", "🎂", "🎈", "👑", "💍", "🕊️", "🥂"].map(em => (
+                  <button key={em} onClick={() => addEmoji(em)} className="flex items-center justify-center p-1.5 bg-secondary hover:bg-secondary/70 rounded text-xl" title={em}>
+                    {em}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </aside>
 
