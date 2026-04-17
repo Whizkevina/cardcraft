@@ -482,20 +482,33 @@ export default function Editor() {
 
   const setBg = (val: string, type: "color" | "gradient" = "color") => {
     if (!fabricRef.current) return;
+    
+    const canvas = fabricRef.current;
+    // Look for dedicated background object, OR a full-canvas sized rectangle sitting at the back
+    const bgObj = canvas.getObjects().find((o: any) => o.customType === "background" || (o.type === "rect" && o.width >= canvas.width - 20 && o.height >= canvas.height - 20 && o.left <= 10 && o.top <= 10 && !o.selectable));
+    
+    let fillVal: any = val;
+
     if (type === "gradient") {
       const f = (window as any).fabric;
-      const gradient = new f.Gradient({
+      fillVal = new f.Gradient({
         type: 'linear',
-        coords: { x1: 0, y1: 0, x2: fabricRef.current.width, y2: fabricRef.current.height },
+        coords: { x1: 0, y1: 0, x2: 0, y2: bgObj ? bgObj.height : canvas.height },
         colorStops: [
           { offset: 0, color: val },
           { offset: 1, color: '#111' }
         ]
       });
-      fabricRef.current.setBackgroundColor(gradient, fabricRef.current.renderAll.bind(fabricRef.current));
-    } else {
-      fabricRef.current.setBackgroundColor(val, fabricRef.current.renderAll.bind(fabricRef.current));
     }
+
+    if (bgObj) {
+      bgObj.set("fill", fillVal);
+      canvas.renderAll();
+    } else {
+      // Fallback: apply to root canvas background property
+      canvas.setBackgroundColor(fillVal, canvas.renderAll.bind(canvas));
+    }
+    
     saveHistory();
   };
 
