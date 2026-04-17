@@ -198,7 +198,9 @@ export default function BulkGenerate() {
         }, 100);
       });
     });
-  };\n\n  const generateAll = async () => {
+  };
+
+  const generateAll = async () => {
     if (!templateId) { toast({ title: "Select a template", variant: "destructive" }); return; }
     if (rows.length === 0) { toast({ title: "Import a CSV first", variant: "destructive" }); return; }
 
