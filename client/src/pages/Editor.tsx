@@ -934,7 +934,8 @@ export default function Editor() {
   const textAlign = selectedObj?.textAlign || "left";
   const isBold = selectedObj?.fontWeight === "bold";
   const isItalic = selectedObj?.fontStyle === "italic";
-  const fillColor = selectedObj?.fill || "#FFFFFF";
+  const rawFill = selectedObj?.fill;
+  const fillColor = typeof rawFill === "string" ? rawFill : "#FFFFFF"; // Protect against gradient objects
   const isLocked = selectedObj?.selectable === false;
   const opacity = selectedObj?.opacity !== undefined ? Math.round(selectedObj.opacity * 100) : 100;
 
