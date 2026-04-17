@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import Navbar from "../components/Navbar";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Download, Palette, Layers, Image, GraduationCap, Church, Building2, Undo2, ZoomIn, ArrowRight, CheckCircle } from "lucide-react";
+import { Sparkles, Download, Palette, Layers, Image, GraduationCap, Church, Building2, Undo2, ZoomIn, ArrowRight, CheckCircle, Users } from "lucide-react";
 
 const features = [
   { icon: Palette, title: "8 Professional Templates", desc: "Birthday, graduation, church anniversaries, and corporate milestones — every design fully editable." },
@@ -11,7 +11,7 @@ const features = [
   { icon: ZoomIn, title: "Zoom & Pan", desc: "Scroll to zoom in and inspect details. Works on desktop and mobile." },
   { icon: Download, title: "High-Res Export", desc: "Download in PNG or JPG at multiple size presets including 1080×1080 for social media." },
   { icon: Sparkles, title: "Rich Text Controls", desc: "Font family, size, color, bold, italic, opacity, and drop shadow — all adjustable." },
-  { icon: Layers, title: "Bulk Generator", desc: "Upload a CSV and generate a personalized card for every name automatically." },
+  { icon: Users, title: "Bulk Generator", desc: "Upload a CSV and generate a personalized card for every name automatically." },
 ];
 
 const TEMPLATES = [
@@ -82,21 +82,23 @@ export default function Landing() {
           </div>
 
           {/* Template preview strip */}
-          <div className="grid grid-cols-4 sm:grid-cols-8 gap-2 max-w-3xl mx-auto">
+          <div className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-8 gap-3 max-w-4xl mx-auto px-2">
             {TEMPLATES.map((t, i) => (
               <div
                 key={i}
-                className={`template-card ${TEMPLATE_CLASSES[i]} rounded-xl overflow-hidden border border-border cursor-pointer aspect-square relative`}
+                className={`template-card ${TEMPLATE_CLASSES[i]} rounded-xl overflow-hidden border border-border cursor-pointer aspect-[3/4] relative shadow-sm hover:shadow-md transition-all hover:-translate-y-1`}
                 onClick={() => { window.location.hash = "#/templates"; }}
                 data-testid={`card-preview-${i}`}
               >
-                <div className="absolute inset-0 flex items-end justify-center pb-1.5">
-                  <span className={`text-[7px] font-medium leading-tight text-center px-1 template-label-${i}`}>{t.label}</span>
+                <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/80 to-transparent flex items-end justify-center">
+                  <span className="text-[10px] sm:text-xs font-medium leading-tight text-white text-center truncate px-1">
+                    {t.label}
+                  </span>
                 </div>
               </div>
             ))}
           </div>
-          <p className="text-xs text-muted-foreground mt-3">8 templates across 4 occasion types</p>
+          <p className="text-xs text-muted-foreground mt-5">8 templates across 4 occasion types</p>
         </div>
       </section>
 
@@ -206,10 +208,10 @@ export default function Landing() {
           <div className="flex items-center gap-2">
             <svg aria-label="CardCraft" viewBox="0 0 32 32" fill="none" className="w-6 h-6">
               <rect width="32" height="32" rx="8" fill="hsl(43 96% 58%)"/>
-              <rect x="6" y="8" width="20" height="16" rx="3" fill="none" stroke="hsl(240 20% 7%)" strokeWidth="2"/>
-              <path d="M6 14h20" stroke="hsl(240 20% 7%)" strokeWidth="1.5"/>
-              <circle cx="10" cy="20" r="1.5" fill="hsl(240 20% 7%)"/>
-              <path d="M13 20h9" stroke="hsl(240 20% 7%)" strokeWidth="1.5" strokeLinecap="round"/>
+              <rect x="6" y="8" width="20" height="16" rx="3" fill="none" stroke="#222" strokeWidth="2"/>
+              <path d="M6 14h20" stroke="#222" strokeWidth="1.5"/>
+              <circle cx="10" cy="20" r="1.5" fill="#222"/>
+              <path d="M13 20h9" stroke="#222" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
             <span className="text-sm font-semibold logo-text">CardCraft</span>
           </div>
