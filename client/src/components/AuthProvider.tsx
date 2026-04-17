@@ -57,7 +57,7 @@ function ForcePasswordDialog({ onDone }: { onDone: () => void }) {
 
   return (
     <Dialog open>
-      <DialogContent className="sm:max-w-sm" onInteractOutside={e => e.preventDefault()}>
+      <DialogContent className="sm:max-w-sm" onInteractOutside={e => e.preventDefault()} aria-describedby={undefined}>
         <DialogHeader>
           <div className="flex items-center gap-2">
             <ShieldAlert size={18} className="text-amber-500" />

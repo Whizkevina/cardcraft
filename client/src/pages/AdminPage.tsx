@@ -137,7 +137,7 @@ function CreateTemplateDialog({ onCreated }: { onCreated: () => void }) {
           <Plus size={15} /> New Template
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-sm" aria-describedby={undefined}>
         <DialogHeader><DialogTitle>Create Template</DialogTitle></DialogHeader>
         <div className="space-y-4 pt-2">
           <div className="space-y-1.5">

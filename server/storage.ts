@@ -125,8 +125,8 @@ export class Storage {
     const today = new Date().toISOString().split("T")[0];
     const cardsToday = await getDb().select({ count: sql`count(*)` }).from(schema.projects).where(sql`DATE(created_at) = ${today}`);
     const signupsToday = await getDb().select({ count: sql`count(*)` }).from(schema.users).where(sql`DATE(created_at) = ${today}`);
-    const topTemplates = await getDb().select({ title: schema.templates.title, usage_count: schema.templates.usageCount }).from(schema.templates).orderBy(desc(schema.templates.usageCount)).limit(5);
-    const recentSignups = await getDb().select({ name: schema.users.name, email: schema.users.email }).from(schema.users).orderBy(desc(schema.users.createdAt)).limit(10);
+    const topTemplates = await getDb().select({ id: schema.templates.id, title: schema.templates.title, uses: schema.templates.usageCount, thumbnailColor: schema.templates.thumbnailColor }).from(schema.templates).orderBy(desc(schema.templates.usageCount)).limit(5);
+    const recentSignups = await getDb().select({ id: schema.users.id, name: schema.users.name, email: schema.users.email, createdAt: schema.users.createdAt, tier: schema.users.tier }).from(schema.users).orderBy(desc(schema.users.createdAt)).limit(10);
     return { totalUsers: (totalUsers[0]?.count as any) || 0, proUsers: (proUsers[0]?.count as any) || 0, totalCards: (totalCards[0]?.count as any) || 0, totalRevenue: (totalRevenue[0]?.sum as any) || 0, cardsToday: (cardsToday[0]?.count as any) || 0, signupsToday: (signupsToday[0]?.count as any) || 0, topTemplates, recentSignups };
   }
   async getAllTemplates(): Promise<Template[]> { return getDb().select().from(schema.templates).orderBy(desc(schema.templates.id)); }

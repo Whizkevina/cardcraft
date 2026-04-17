@@ -96,7 +96,7 @@ export function QRDialog({ open, onClose, fabricRef }: QRDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-sm" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <QrCode size={16} className="text-gold" /> Add QR Code
