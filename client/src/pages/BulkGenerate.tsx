@@ -16,6 +16,7 @@ interface BulkRow {
   greeting: string;
   date: string;
   subtitle?: string;
+  image?: string;
   status: "pending" | "generating" | "done" | "error";
   dataUrl?: string;
 }
@@ -71,7 +72,7 @@ export default function BulkGenerate() {
     const reader = new FileReader();
     reader.onload = ev => {
       const parsed = parseCSV(ev.target?.result as string);
-      if (parsed.length === 0) { toast({ title: "Invalid CSV", description: "Make sure CSV has headers: name, greeting, date, subtitle", variant: "destructive" }); return; }
+      if (parsed.length === 0) { toast({ title: "Invalid CSV", description: "Make sure CSV has headers: name, greeting, date, subtitle, image", variant: "destructive" }); return; }
       setRows(parsed);
       toast({ title: `${parsed.length} rows imported`, description: "Ready to generate cards." });
     };
@@ -103,7 +104,6 @@ export default function BulkGenerate() {
       el.height = h;
       const canvas = new f.StaticCanvas(el, { width: w, height: h });
 
-      // Override texts in JSON directly before loading
       if (data.objects) {
         data.objects = data.objects.map((obj: any) => {
           if (obj.customType === "name" && row.name) obj.text = row.name;
@@ -114,7 +114,79 @@ export default function BulkGenerate() {
         });
       }
 
-      canvas.loadFromJSON(data, () => {
+      canvas.loadFromJSON(data, async () => {
+        const frameObj = canvas.getObjects().find((o: any) => o.customType === "photo_frame" || o.customType === "photo_image" || o.customType === "logo");
+        
+        if (frameObj) {
+          const frameIndex = canvas.getObjects().indexOf(frameObj);
+          
+          if (row.image && row.image.startsWith("http")) {
+            await new Promise<void>(res => {
+              const imgElement = new Image();
+              imgElement.crossOrigin = "anonymous";
+              imgElement.onload = () => {
+                const isCircle = frameObj.type === "circle" || (frameObj.rx && frameObj.rx >= (Math.min(frameObj.width || 100, frameObj.height || 100) / 2) * 0.9);
+                let clipPath: any = null;
+                const sizeW = frameObj.getScaledWidth();
+                const sizeH = frameObj.getScaledHeight();
+                
+                if (isCircle) {
+                  clipPath = new f.Circle({ radius: Math.min(sizeW, sizeH) / 2, originX: "center", originY: "center" });
+                } else {
+                  clipPath = new f.Rect({ width: sizeW, height: sizeH, rx: frameObj.rx || 0, ry: frameObj.ry || 0, originX: "center", originY: "center" });
+                }
+
+                const center = frameObj.getCenterPoint();
+                const scale = Math.max(sizeW / imgElement.width, sizeH / imgElement.height);
+
+                const fabricImg = new f.Image(imgElement, {
+                  left: center.x,
+                  top: center.y,
+                  originX: "center",
+                  originY: "center",
+                  scaleX: scale,
+                  scaleY: scale,
+                  angle: frameObj.angle || 0,
+                  clipPath,
+                  customType: "photo_image"
+                });
+                
+                if (frameObj.customType === "photo_image") canvas.remove(frameObj);
+                canvas.add(fabricImg);
+                fabricImg.moveTo(frameIndex);
+                res();
+              };
+              imgElement.onerror = () => res(); 
+              imgElement.src = row.image;
+            });
+          } else if (row.name) {
+            // Generate initials
+            const words = row.name.trim().split(" ");
+            let initials = (words[0] ? words[0][0] : "").toUpperCase();
+            if (words.length > 1) initials += (words[words.length - 1] ? words[words.length - 1][0] : "").toUpperCase();
+            
+            const center = frameObj.getCenterPoint();
+            const sizeW = frameObj.getScaledWidth();
+            const sizeH = frameObj.getScaledHeight();
+            const size = Math.min(sizeW, sizeH);
+            
+            const textObj = new f.Text(initials, {
+              left: center.x,
+              top: center.y + (size * 0.05), // optical center alignment
+              originX: "center",
+              originY: "center",
+              fontSize: size * 0.45,
+              fill: "#FFFFFF",
+              fontFamily: "Inter, sans-serif",
+              fontWeight: "600",
+              textAlign: "center"
+            });
+            
+            canvas.add(textObj);
+            textObj.moveTo(frameIndex + 1);
+          }
+        }
+
         canvas.renderAll();
         setTimeout(() => {
           try {
@@ -126,9 +198,7 @@ export default function BulkGenerate() {
         }, 100);
       });
     });
-  };
-
-  const generateAll = async () => {
+  };\n\n  const generateAll = async () => {
     if (!templateId) { toast({ title: "Select a template", variant: "destructive" }); return; }
     if (rows.length === 0) { toast({ title: "Import a CSV first", variant: "destructive" }); return; }
 
