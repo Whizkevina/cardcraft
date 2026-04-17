@@ -93,12 +93,10 @@ export default function BulkGenerate() {
 
     return new Promise((resolve, reject) => {
       const data = JSON.parse(template.canvasJson);
-      let w = 400;
-      let h = 500;
-      if (data.backgroundImage && data.backgroundImage.width) {
-        w = data.backgroundImage.width * (data.backgroundImage.scaleX || 1);
-        h = data.backgroundImage.height * (data.backgroundImage.scaleY || 1);
-      }
+      let w = 800;
+      let h = 1000;
+      if (data.canvasWidth) w = data.canvasWidth;
+      if (data.canvasHeight) h = data.canvasHeight;
       
       const el = document.createElement("canvas");
       el.width = w;
