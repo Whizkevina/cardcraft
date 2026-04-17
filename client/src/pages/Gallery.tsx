@@ -6,11 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import { Sparkles, ArrowRight, Palette, GraduationCap, Church, Building2, Search, X } from "lucide-react";
+import { Sparkles, ArrowRight, Palette, GraduationCap, Church, Building2, Search, X, Heart } from "lucide-react";
 import type { Template } from "@shared/schema";
 
 const CATEGORIES = [
   { value: "all", label: "All", icon: Palette },
+  { value: "romance", label: "Romance & Love", icon: Heart },
   { value: "birthday", label: "Birthday", icon: Sparkles },
   { value: "celebration", label: "Celebrations", icon: Sparkles },
   { value: "graduation", label: "Graduation", icon: GraduationCap },
