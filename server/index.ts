@@ -39,18 +39,22 @@ app.use(
           "'unsafe-inline'",    // Vite HMR in dev; tighten with nonces in prod
           "https://js.paystack.co",
           "https://cdnjs.cloudflare.com",
+          "https://accounts.google.com/gsi/client",
         ],
-        styleSrc: ["'self'", "'unsafe-inline'", "https://api.fontshare.com", "https://fonts.googleapis.com"],
-        fontSrc: ["'self'", "https://api.fontshare.com", "https://fonts.gstatic.com"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://api.fontshare.com", "https://fonts.googleapis.com", "https://accounts.google.com/gsi/style"],
+        fontSrc: ["'self'", "https://api.fontshare.com", "https://cdn.fontshare.com", "https://fonts.gstatic.com"],
         imgSrc: ["'self'", "data:", "blob:", "https:"],
-        connectSrc: ["'self'", "http://127.0.0.1:5000", "https://api.paystack.co", "https://cdnjs.cloudflare.com"],
-        frameSrc: ["'self'", "https://checkout.paystack.com"],
+        connectSrc: ["'self'", "http://127.0.0.1:5000", "https://api.paystack.co", "https://cdnjs.cloudflare.com", "https://accounts.google.com/gsi/"],
+        frameSrc: ["'self'", "https://checkout.paystack.com", "https://accounts.google.com/gsi/"],
         objectSrc: ["'none'"],
         baseUri: ["'self'"],
         formAction: ["'self'"],
       },
     },
     // Allow cross-origin for iframe-embedded previews on Perplexity
+    crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+    // Allow cross-origin for iframe-embedded previews on Perplexity
+    crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
     crossOriginEmbedderPolicy: false,
     crossOriginResourcePolicy: { policy: "cross-origin" },
   })
