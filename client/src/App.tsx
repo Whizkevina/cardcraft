@@ -86,9 +86,9 @@ export default function App() {
                   <Route component={NotFound} />
                 </Switch>
               </PageTransition>
+              <CookieBanner />
             </Router>
             <Toaster />
-            <CookieBanner />
           </AuthProvider>
         </ThemeProvider>
       </GoogleOAuthProvider>
