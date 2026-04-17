@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Sparkles, Eye, EyeOff } from "lucide-react";
+import { GoogleLogin } from "@react-oauth/google";
 
 export default function AuthPage() {
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -109,7 +110,40 @@ export default function AuthPage() {
             </Button>
           </form>
 
-          <p className="text-center text-sm text-muted-foreground mt-5">
+          <div className="relative mt-8 mb-6">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-3 text-muted-foreground font-medium">Or continue with</span>
+            </div>
+          </div>
+
+          <div className="flex justify-center">
+            <GoogleLogin
+              onSuccess={async (credentialResponse) => {
+                setLoading(true);
+                try {
+                  await login(undefined, undefined, credentialResponse.credential);
+                  toast({ title: "Welcome back!" });
+                  setLocation("/projects");
+                } catch (err: any) {
+                  toast({ title: "Login failed", description: err.message, variant: "destructive" });
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              onError={() => {
+                toast({ title: "Google login failed", variant: "destructive" });
+              }}
+              theme={document.documentElement.classList.contains("dark") ? "filled_black" : "outline"}
+              size="large"
+              shape="pill"
+              width="320"
+            />
+          </div>
+
+          <p className="text-center text-sm text-muted-foreground mt-8">
             {mode === "login" ? "Don't have an account? " : "Already have an account? "}
             <button onClick={() => setMode(mode === "login" ? "register" : "login")} className="text-primary hover:underline font-medium" data-testid="button-toggle-mode">
               {mode === "login" ? "Sign up free" : "Sign in"}

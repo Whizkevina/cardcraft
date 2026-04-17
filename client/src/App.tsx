@@ -1,6 +1,7 @@
 import { Switch, Route, Router, useLocation } from "wouter";
 import { useHashLocation } from "wouter/use-hash-location";
 import { QueryClientProvider } from "@tanstack/react-query";
+import { GoogleOAuthProvider } from "@react-oauth/google";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "./components/ThemeProvider";
@@ -54,37 +55,41 @@ function PageTransition({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "123456789-placeholder.apps.googleusercontent.com";
+  
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <AuthProvider>
-          <Router hook={useHashLocation}>
-            <PageTransition>
-              <Switch>
-                <Route path="/" component={Landing} />
-                <Route path="/templates" component={Gallery} />
-                <Route path="/editor" component={Editor} />
-                <Route path="/editor/t/:templateId" component={Editor} />
-                <Route path="/editor/p/:projectId" component={Editor} />
-                <Route path="/projects" component={Projects} />
-                <Route path="/bulk" component={BulkGenerate} />
-                <Route path="/pricing" component={PricingPage} />
-                <Route path="/payments" component={PaymentsPage} />
-                <Route path="/settings" component={AccountSettings} />
-                <Route path="/forgot-password" component={ForgotPassword} />
-                <Route path="/reset-password" component={ForgotPassword} />
-                <Route path="/terms" component={LegalPage} />
-                <Route path="/privacy" component={LegalPage} />
-                <Route path="/auth" component={AuthPage} />
-                <Route path="/admin" component={AdminPage} />
-                <Route path="/share/:id" component={SharePage} />
-                <Route component={NotFound} />
-              </Switch>
-            </PageTransition>
-          </Router>
-          <Toaster />
-        </AuthProvider>
-      </ThemeProvider>
+      <GoogleOAuthProvider clientId={clientId}>
+        <ThemeProvider>
+          <AuthProvider>
+            <Router hook={useHashLocation}>
+              <PageTransition>
+                <Switch>
+                  <Route path="/" component={Landing} />
+                  <Route path="/templates" component={Gallery} />
+                  <Route path="/editor" component={Editor} />
+                  <Route path="/editor/t/:templateId" component={Editor} />
+                  <Route path="/editor/p/:projectId" component={Editor} />
+                  <Route path="/projects" component={Projects} />
+                  <Route path="/bulk" component={BulkGenerate} />
+                  <Route path="/pricing" component={PricingPage} />
+                  <Route path="/payments" component={PaymentsPage} />
+                  <Route path="/settings" component={AccountSettings} />
+                  <Route path="/forgot-password" component={ForgotPassword} />
+                  <Route path="/reset-password" component={ForgotPassword} />
+                  <Route path="/terms" component={LegalPage} />
+                  <Route path="/privacy" component={LegalPage} />
+                  <Route path="/auth" component={AuthPage} />
+                  <Route path="/admin" component={AdminPage} />
+                  <Route path="/share/:id" component={SharePage} />
+                  <Route component={NotFound} />
+                </Switch>
+              </PageTransition>
+            </Router>
+            <Toaster />
+          </AuthProvider>
+        </ThemeProvider>
+      </GoogleOAuthProvider>
     </QueryClientProvider>
   );
 }

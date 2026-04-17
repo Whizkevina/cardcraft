@@ -23,7 +23,7 @@ interface AuthCtx {
   isLoading: boolean;
   isPro: boolean;
   isAdmin: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email?: string, password?: string, googleCredential?: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -122,8 +122,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const loginMutation = useMutation({
-    mutationFn: async ({ email, password }: { email: string; password: string }) => {
-      const res = await apiRequest("POST", "/api/auth/login", { email, password });
+    mutationFn: async ({ email, password, googleCredential }: { email?: string; password?: string; googleCredential?: string }) => {
+      let res;
+      if (googleCredential) {
+        res = await apiRequest("POST", "/api/auth/google", { credential: googleCredential });
+      } else {
+        res = await apiRequest("POST", "/api/auth/login", { email, password });
+      }
       if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
       return res.json();
     },
@@ -169,7 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading,
       isPro: user?.tier === "pro",
       isAdmin: user?.role === "admin",
-      login: (email, password) => loginMutation.mutateAsync({ email, password }),
+      login: (email?: string, password?: string, googleCredential?: string) => loginMutation.mutateAsync({ email, password, googleCredential }),
       register: (name, email, password) => registerMutation.mutateAsync({ name, email, password }),
       logout: () => logoutMutation.mutateAsync(),
     }}>

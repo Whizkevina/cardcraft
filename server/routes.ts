@@ -276,6 +276,60 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     } catch (e: any) { res.status(500).json({ error: "Registration failed" }); }
   });
 
+  // ─── Google OAuth ────────────────────────────────────────────────────────────
+  app.post("/api/auth/google", authLimiter, async (req, res) => {
+    try {
+      const { credential } = req.body;
+      if (!credential) return res.status(400).json({ error: "Missing Google credential" });
+
+      const clientId = process.env.VITE_GOOGLE_CLIENT_ID;
+      if (!clientId) {
+        console.error("[Google OAuth] VITE_GOOGLE_CLIENT_ID is not configured in the environment.");
+        return res.status(500).json({ error: "Google OAuth is not configured" });
+      }
+
+      // Import inside route so it's lazy-loaded
+      const { OAuth2Client } = require("google-auth-library");
+      const client = new OAuth2Client(clientId);
+
+      const ticket = await client.verifyIdToken({
+        idToken: credential,
+        audience: clientId,
+      });
+
+      const payload = ticket.getPayload();
+      if (!payload || !payload.email) return res.status(400).json({ error: "Invalid Google payload" });
+
+      const normalEmail = validator.normalizeEmail(payload.email) || payload.email.toLowerCase().trim();
+      let user = await storage.getUserByEmail(normalEmail);
+
+      // Register new user seamlessly if they don't exist
+      if (!user) {
+        const name = payload.name || "Google User";
+        // Create an uncrackable random placeholder password for OAuth users
+        const dummyHash = await bcrypt.hash("OAUTH_PLACEHOLDER_" + crypto.randomBytes(32).toString("hex"), 12);
+        user = await storage.createUser({
+          name,
+          email: normalEmail,
+          password: dummyHash,
+          role: "user",
+          tier: "free"
+        });
+      }
+
+      // Automatically create a session
+      req.session.userId = user.id;
+      req.session.userRole = user.role;
+      req.session.userTier = user.tier;
+      req.session.mustChangePassword = false;
+
+      res.status(200).json({ user: safeUser(user) });
+    } catch (e: any) {
+      console.error("[Google OAuth] Error verifying token:", e);
+      res.status(401).json({ error: "Google authentication failed" });
+    }
+  });
+
   app.post("/api/auth/login", authLimiter, async (req, res) => {
     try {
       const { email, password } = req.body;
