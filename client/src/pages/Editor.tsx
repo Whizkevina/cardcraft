@@ -209,7 +209,7 @@ export default function Editor() {
     // Single-click selects, double-click enters text edit mode
     canvas.on("mouse:dblclick", (opt: any) => {
       const target = opt.target;
-      if (target && (target.type === "i-text" || target.type === "text")) {
+      if (target && (target.type === "i-text" || target.type === "text" || target.type === "textbox")) {
         canvas.setActiveObject(target);
         target.enterEditing();
         target.selectAll();
@@ -321,7 +321,7 @@ export default function Editor() {
             addObject(obj, new f.Rect(s));
           } else if (obj.type === "circle") {
             addObject(obj, new f.Circle(s));
-          } else if (obj.type === "text" || obj.type === "i-text") {
+          } else if (obj.type === "text" || obj.type === "i-text" || obj.type === "textbox") {
             // For text with gradient, use solid orange fallback at creation, then apply gradient after render
             const textS = { ...s };
             if (obj.fillGradient) textS.fill = obj.fillGradient.colorStops?.[1]?.color || '#f09820';
@@ -381,7 +381,7 @@ export default function Editor() {
         // 3. The focused element is NOT an input/textarea (panel fields)
         const focusedTag = (document.activeElement as HTMLElement)?.tagName?.toLowerCase();
         const isInputFocused = focusedTag === "input" || focusedTag === "textarea";
-        const isTextEditing = active?.type === "i-text" && (active as any).isEditing;
+        const isTextEditing = (active?.type === "i-text" || active?.type === "text" || active?.type === "textbox") && (active as any).isEditing;
         if (active && !isTextEditing && !isInputFocused) {
           fabricRef.current?.remove(active);
           fabricRef.current?.renderAll();
@@ -996,7 +996,7 @@ export default function Editor() {
   const getLayerLabel = (obj: any) => {
     const cmap: Record<string, string> = { background: "Background", photo_frame: "Photo Frame", greeting: "Greeting", name: "Name", date: "Date", subtitle: "Subtitle", logo: "Logo" };
     if (obj.customType && cmap[obj.customType]) return cmap[obj.customType];
-    if (obj.type === "i-text" || obj.type === "text") return "Text: " + (obj.text || "").slice(0, 12) + "...";
+    if (obj.type === "i-text" || obj.type === "text" || obj.type === "textbox") return "Text: " + (obj.text || "").slice(0, 12) + "...";
     if (obj.type === "image") return "Image";
     if (obj.type === "rect") return "Rectangle";
     if (obj.type === "circle") return "Circle";
@@ -1009,7 +1009,7 @@ export default function Editor() {
   const hasPhotoImage = layers.some((o: any) => o.customType === "photo_image" || o.customType === "logo_image");
   const showPhotoHint = hasPhotoFrame && !hasPhotoImage;
 
-  const isText = selectedObj?.type === "i-text" || selectedObj?.type === "text";
+  const isText = selectedObj?.type === "i-text" || selectedObj?.type === "text" || selectedObj?.type === "textbox";
   const isImage = selectedObj?.type === "image";
   const imageRx = selectedObj?.rx || 0;
   const textValue = selectedObj?.text || "";
@@ -1106,7 +1106,7 @@ export default function Editor() {
                 className={`w-full text-left px-2 py-1.5 rounded text-xs flex items-center gap-2 hover:bg-secondary transition-colors ${selectedObj === obj ? "bg-secondary text-foreground" : "text-muted-foreground"}`}
                 data-testid={`button-layer-${i}`}
               >
-                {obj.type === "i-text" || obj.type === "text" ? <Type size={10} /> : obj.type === "image" ? <ImageIcon size={10} /> : <Layers size={10} />}
+                {obj.type === "i-text" || obj.type === "text" || obj.type === "textbox" ? <Type size={10} /> : obj.type === "image" ? <ImageIcon size={10} /> : <Layers size={10} />}
                 <span className="truncate">{getLayerLabel(obj)}</span>
                 {!obj.selectable && <Lock size={8} className="ml-auto flex-shrink-0 opacity-50" />}
               </button>
@@ -1472,7 +1472,7 @@ export default function Editor() {
                     </div>
                     <div className="flex gap-2 items-center">
                       <Label className="text-xs">Color:</Label>
-                      <input type="color" value={textColor.startsWith("#") ? textColor : "#fff"} aria-label="Text color" title="Text color"
+                      <input type="color" value={textColor.startsWith("#") ? textColor : "#ffffff"} aria-label="Text color" title="Text color"
                         onChange={e => updateSelectedProp("fill", e.target.value)}
                         className="w-8 h-8 rounded cursor-pointer border border-border" />
                     </div>
@@ -1497,7 +1497,7 @@ export default function Editor() {
                 {layers.map((obj, i) => (
                   <button key={i} onClick={() => { fabricRef.current?.setActiveObject(obj); fabricRef.current?.renderAll(); setSelectedObj(obj); setMobilePanel(null); }}
                     className="w-full text-left px-3 py-2 rounded text-sm flex items-center gap-2 hover:bg-secondary">
-                    {obj.type === "i-text" || obj.type === "text" ? <Type size={12} /> : <ImageIcon size={12} />}
+                    {obj.type === "i-text" || obj.type === "text" || obj.type === "textbox" ? <Type size={12} /> : <ImageIcon size={12} />}
                     <span className="truncate">{getLayerLabel(obj)}</span>
                   </button>
                 ))}
