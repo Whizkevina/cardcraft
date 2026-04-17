@@ -5,6 +5,7 @@ import Navbar from "../components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { colorSwatchDataUri } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, Download, Layers, FileText, CheckCircle, XCircle, Loader2, Play } from "lucide-react";
 import type { Template } from "@shared/schema";
