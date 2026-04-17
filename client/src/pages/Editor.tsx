@@ -456,19 +456,46 @@ export default function Editor() {
     fabricRef.current.renderAll();
   };
 
-  const addShape = (shape: "rect" | "circle") => {
+  const addShape = (shape: "rect" | "circle" | "triangle" | "star") => {
     const f = (window as any).fabric;
     if (!f || !fabricRef.current) return;
-    const obj = shape === "rect"
-      ? new f.Rect({ left: 80, top: 180, width: 150, height: 80, fill: "#FFD700", rx: 8, ry: 8 })
-      : new f.Circle({ left: 80, top: 180, radius: 60, fill: "#FFD700" });
+    
+    let obj: any;
+    if (shape === "rect") {
+      obj = new f.Rect({ left: 80, top: 180, width: 150, height: 80, fill: "#FFD700", rx: 8, ry: 8 });
+    } else if (shape === "circle") {
+      obj = new f.Circle({ left: 80, top: 180, radius: 60, fill: "#FFD700" });
+    } else if (shape === "triangle") {
+      obj = new f.Triangle({ left: 80, top: 180, width: 100, height: 100, fill: "#FFD700" });
+    } else if (shape === "star") {
+      obj = new f.Polygon([
+        { x: 50, y: 0 }, { x: 61, y: 35 }, { x: 98, y: 35 }, { x: 68, y: 57 },
+        { x: 79, y: 91 }, { x: 50, y: 70 }, { x: 21, y: 91 }, { x: 32, y: 57 },
+        { x: 2, y: 35 }, { x: 39, y: 35 }
+      ], { left: 80, top: 180, fill: "#FFD700" });
+    }
+    
     fabricRef.current.add(obj);
     fabricRef.current.setActiveObject(obj);
     fabricRef.current.renderAll();
   };
 
-  const setBg = (color: string) => {
-    fabricRef.current?.setBackgroundColor(color, fabricRef.current.renderAll.bind(fabricRef.current));
+  const setBg = (val: string, type: "color" | "gradient" = "color") => {
+    if (!fabricRef.current) return;
+    if (type === "gradient") {
+      const f = (window as any).fabric;
+      const gradient = new f.Gradient({
+        type: 'linear',
+        coords: { x1: 0, y1: 0, x2: fabricRef.current.width, y2: fabricRef.current.height },
+        colorStops: [
+          { offset: 0, color: val },
+          { offset: 1, color: '#111' }
+        ]
+      });
+      fabricRef.current.setBackgroundColor(gradient, fabricRef.current.renderAll.bind(fabricRef.current));
+    } else {
+      fabricRef.current.setBackgroundColor(val, fabricRef.current.renderAll.bind(fabricRef.current));
+    }
     saveHistory();
   };
 
@@ -1002,6 +1029,12 @@ export default function Editor() {
             <button onClick={() => addShape("circle")} className="w-full text-left text-xs px-3 py-2 rounded bg-secondary hover:bg-secondary/70 flex items-center gap-2">
               <Palette size={12} /> Circle
             </button>
+            <button onClick={() => addShape("triangle")} className="w-full text-left text-xs px-3 py-2 rounded bg-secondary hover:bg-secondary/70 flex items-center gap-2">
+              <Palette size={12} /> Triangle
+            </button>
+            <button onClick={() => addShape("star")} className="w-full text-left text-xs px-3 py-2 rounded bg-secondary hover:bg-secondary/70 flex items-center gap-2">
+              <Palette size={12} /> Star (Sticker)
+            </button>
           </div>
         </aside>
 
@@ -1174,6 +1207,16 @@ export default function Editor() {
                   <input type="color" defaultValue="#1a0533" onChange={e => setBg(e.target.value)}
                     className="w-8 h-8 rounded cursor-pointer border border-border bg-transparent" data-testid="input-bg-color" />
                   <span className="text-xs text-muted-foreground">Custom color</span>
+                </div>
+                
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider !mt-6">Gradient Backgrounds</p>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {BG_PRESETS.map(bg => (
+                    <button key={`grad-${bg.value}`} onClick={() => setBg(bg.value, "gradient")} title={`${bg.label} Gradient`}
+                      className="w-full aspect-square rounded-md border border-border hover:scale-110 transition-transform"
+                      style={{ background: `linear-gradient(to bottom, ${bg.value}, #111)` }}
+                    />
+                  ))}
                 </div>
               </div>
 
