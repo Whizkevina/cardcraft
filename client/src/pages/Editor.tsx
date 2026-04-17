@@ -15,13 +15,13 @@ import {
   ChevronUp, ChevronDown, Lock, Unlock, Trash2,
   Image as ImageIcon, RotateCcw, X, Undo2, Redo2,
   ZoomIn, ZoomOut, Maximize, Wand2, Loader2 as SpinIcon,
-  RefreshCw, MousePointer
+  RefreshCw, MousePointer, Grid3x3
 } from "lucide-react";
 import type { Template, Project } from "@shared/schema";
 import { SharePanel } from "../components/SharePanel";
 import { QRDialog } from "../components/QRDialog";
 
-const FONTS = ["Georgia", "Arial", "Times New Roman", "Trebuchet MS", "Verdana", "Impact", "Great Vibes", "Courier New"];
+const FONTS = ["Georgia", "Arial", "Times New Roman", "Trebuchet MS", "Verdana", "Impact", "Great Vibes", "Courier New", "Tahoma", "Palatino", "Comic Sans MS", "Oswald", "Lucida Console", "Garamond"];
 
 const FONT_PREVIEW_CLASSES: Record<string, string> = {
   Georgia: "font-preview-georgia",
@@ -32,6 +32,12 @@ const FONT_PREVIEW_CLASSES: Record<string, string> = {
   Impact: "font-preview-impact",
   "Great Vibes": "font-preview-great-vibes",
   "Courier New": "font-preview-courier",
+  "Tahoma": "font-preview-tahoma",
+  "Palatino": "font-preview-palatino",
+  "Comic Sans MS": "font-preview-comic",
+  "Oswald": "font-preview-oswald",
+  "Lucida Console": "font-preview-lucida",
+  "Garamond": "font-preview-garamond"
 };
 
 const FONT_PREVIEW_CLASS = (font: string) => FONT_PREVIEW_CLASSES[font] || "font-preview-default";
@@ -94,6 +100,7 @@ export default function Editor() {
   const [exportPreset, setExportPreset] = useState(EXPORT_PRESETS[0]);
   const [isDirty, setIsDirty] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [showGrid, setShowGrid] = useState(false);
   // ref to track replace-photo input for currently selected image
   const replacePhotoInputRef = useRef<HTMLInputElement>(null);
 
@@ -186,6 +193,18 @@ export default function Editor() {
     canvas.on("object:modified", () => { setSelectedObj(canvas.getActiveObject()); saveHistory(); setIsDirty(true); });
     canvas.on("object:added", () => { saveHistory(); setIsDirty(true); });
     canvas.on("object:removed", () => { saveHistory(); setIsDirty(true); });
+
+    // Grid snapping logic
+    const grid = 20;
+    canvas.on("object:moving", (options: any) => {
+      // NOTE: Checking the React state explicitly via a ref wouldn't re-bind this event listener perfectly unless we update the event listener or attach a property to the canvas.
+      // So we attach a flag `snapToGrid` to the canvas itself when showGrid state toggles.
+      if (!canvas.snapToGrid) return;
+      options.target.set({
+        left: Math.round(options.target.left / grid) * grid,
+        top: Math.round(options.target.top / grid) * grid
+      });
+    });
 
     // Single-click selects, double-click enters text edit mode
     canvas.on("mouse:dblclick", (opt: any) => {
@@ -384,6 +403,53 @@ export default function Editor() {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [isDirty]);
+
+  // ─── Gridlines rendering ───────────────────────────────────────────
+  useEffect(() => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    
+    // Toggle internal snap flag
+    canvas.snapToGrid = showGrid;
+    
+    // Clear old grids
+    const oldGrids = canvas.getObjects().filter((o: any) => o.customType === "gridgroup");
+    oldGrids.forEach((gObj: any) => canvas.remove(gObj));
+
+    if (showGrid) {
+      const f = (window as any).fabric;
+      const gridSize = 20;
+      const lines = [];
+      const gridOptions = {
+        stroke: 'rgba(255,255,255,0.1)', 
+        strokeWidth: 1, 
+        selectable: false, 
+        evented: false,
+        excludeFromExport: true
+      };
+      
+      for (let i = 0; i <= Math.ceil(canvas.width / gridSize); i++) {
+        lines.push(new f.Line([ i * gridSize, 0, i * gridSize, canvas.height], gridOptions));
+      }
+      for (let i = 0; i <= Math.ceil(canvas.height / gridSize); i++) {
+        lines.push(new f.Line([ 0, i * gridSize, canvas.width, i * gridSize], gridOptions));
+      }
+      
+      const gridGroup = new f.Group(lines, {
+        left: 0, top: 0, selectable: false, evented: false, customType: 'gridgroup', excludeFromExport: true
+      });
+      canvas.add(gridGroup);
+      
+      // Push grid to back, but just above background
+      canvas.sendToBack(gridGroup);
+      const bgObj = canvas.getObjects().find((o: any) => o.customType === "background" || (o.type === "rect" && !o.selectable && o.width >= canvas.width - 20));
+      if (bgObj) {
+        canvas.bringForward(gridGroup);
+      }
+    }
+    
+    canvas.renderAll();
+  }, [showGrid, canvasReady]);
 
   // ─── Replace photo in-place ────────────────────────────────────────
   const handleReplacePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -998,6 +1064,10 @@ export default function Editor() {
           </button>
           <button onClick={fitCanvas} title="Fit to view" className="p-1.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground">
             <Maximize size={14} />
+          </button>
+          <div className="w-px h-4 bg-border mx-1" />
+          <button onClick={() => setShowGrid(!showGrid)} title={showGrid ? "Hide Gridlines" : "Show Snapping Gridlines"} className={`p-1.5 rounded transition-colors ${showGrid ? 'bg-primary/20 text-primary' : 'hover:bg-secondary text-muted-foreground hover:text-foreground'}`}>
+            <Grid3x3 size={14} />
           </button>
         </div>
 

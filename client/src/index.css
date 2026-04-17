@@ -333,3 +333,12 @@
 .share-card-shadow {
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3);
 }
+
+@font-face { font-family: 'Oswald'; src: local('Oswald'); }
+
+.font-preview-tahoma { font-family: 'Tahoma', sans-serif; }
+.font-preview-palatino { font-family: 'Palatino', serif; }
+.font-preview-comic { font-family: 'Comic Sans MS', cursive; }
+.font-preview-oswald { font-family: 'Oswald', sans-serif; }
+.font-preview-lucida { font-family: 'Lucida Console', monospace; }
+.font-preview-garamond { font-family: 'Garamond', serif; }
