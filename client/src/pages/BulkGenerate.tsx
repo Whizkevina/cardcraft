@@ -91,55 +91,41 @@ export default function BulkGenerate() {
     await ensureFabric();
     const f = (window as any).fabric;
 
-    return new Promise(resolve => {
-      const el = document.createElement("canvas");
-      el.width = 400; el.height = 500;
-      const canvas = new f.StaticCanvas(el, { width: 400, height: 500 });
-
-      const scaleX = 400 / 800, scaleY = 500 / 1000;
+    return new Promise((resolve, reject) => {
       const data = JSON.parse(template.canvasJson);
+      let w = 400;
+      let h = 500;
+      if (data.backgroundImage && data.backgroundImage.width) {
+        w = data.backgroundImage.width * (data.backgroundImage.scaleX || 1);
+        h = data.backgroundImage.height * (data.backgroundImage.scaleY || 1);
+      }
+      
+      const el = document.createElement("canvas");
+      el.width = w;
+      el.height = h;
+      const canvas = new f.StaticCanvas(el, { width: w, height: h });
 
-      if (data.background) canvas.setBackgroundColor(data.background, () => {});
+      // Override texts in JSON directly before loading
+      if (data.objects) {
+        data.objects = data.objects.map((obj: any) => {
+          if (obj.customType === "name" && row.name) obj.text = row.name;
+          if (obj.customType === "greeting" && row.greeting) obj.text = row.greeting;
+          if (obj.customType === "date" && row.date) obj.text = row.date;
+          if (obj.customType === "subtitle" && row.subtitle) obj.text = row.subtitle;
+          return obj;
+        });
+      }
 
-      const objDefs = data.objects || [];
-      let pending = objDefs.length;
-      if (pending === 0) { resolve(canvas.toDataURL({ format: "jpeg", quality: 0.92, multiplier: 2 })); return; }
-
-      objDefs.forEach((obj: any) => {
-        const s = {
-          ...obj,
-          left: (obj.left || 0) * scaleX,
-          top: (obj.top || 0) * scaleY,
-          width: obj.width !== undefined ? obj.width * scaleX : undefined,
-          height: obj.height !== undefined ? obj.height * scaleY : undefined,
-          radius: obj.radius !== undefined ? obj.radius * scaleX : undefined,
-          fontSize: obj.fontSize !== undefined ? Math.round(obj.fontSize * scaleX) : undefined,
-          strokeWidth: obj.strokeWidth !== undefined ? obj.strokeWidth * scaleX : undefined,
-          rx: obj.rx !== undefined ? obj.rx * scaleX : undefined,
-          ry: obj.ry !== undefined ? obj.ry * scaleY : undefined,
-        };
-
-        // Override text based on customType
-        let textOverride = obj.text;
-        if (obj.customType === "name") textOverride = row.name || obj.text;
-        if (obj.customType === "greeting") textOverride = row.greeting || obj.text;
-        if (obj.customType === "date") textOverride = row.date || obj.text;
-        if (obj.customType === "subtitle") textOverride = row.subtitle || obj.text;
-
-        let fabricObj: any;
-        if (obj.type === "rect") fabricObj = new f.Rect(s);
-        else if (obj.type === "circle") fabricObj = new f.Circle(s);
-        else if (obj.type === "text" || obj.type === "i-text") fabricObj = new f.Text(textOverride || obj.text, { ...s, type: undefined });
-        
-        if (fabricObj) canvas.add(fabricObj);
-        pending--;
-        if (pending === 0) {
-          canvas.renderAll();
-          setTimeout(() => {
-            resolve(canvas.toDataURL({ format: "jpeg", quality: 0.92, multiplier: 2 }));
-            canvas.dispose();
-          }, 100);
-        }
+      canvas.loadFromJSON(data, () => {
+        canvas.renderAll();
+        setTimeout(() => {
+          try {
+            resolve(canvas.toDataURL({ format: "jpeg", quality: 1, multiplier: 2 }));
+          } catch(e) {
+            reject(e);
+          }
+          canvas.dispose();
+        }, 100);
       });
     });
   };
