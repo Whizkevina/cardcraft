@@ -135,21 +135,33 @@ export function SharePanel({ fabricRef, projectTitle, projectId, onQROpen }: Sha
       const dataURL = getExportDataURL("jpeg");
       if (!dataURL) return;
 
-      // On mobile, use Web Share API if available
-      if (navigator.share) {
+      const fName = `${projectTitle.replace(/\s+/g, "-")}.jpg`;
+
+      let didShare = false;
+      // On mobile/supported browser, use Web Share API if available
+      if (navigator.share && navigator.canShare) {
         const res = await fetch(dataURL);
         const blob = await res.blob();
-        const file = new File([blob], `${projectTitle}.jpg`, { type: "image/jpeg" });
-        await navigator.share({ files: [file], title: projectTitle });
-        toast({ title: "Shared!" });
-      } else {
-        // Desktop: download + open WhatsApp Web
+        const file = new File([blob], fName, { type: "image/jpeg" });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: projectTitle });
+          toast({ title: "Shared!" });
+          didShare = true;
+        }
+      }
+
+      if (!didShare) {
+        // Desktop / incompatible fallback: download + open WhatsApp Web
         const a = document.createElement("a");
         a.href = dataURL;
-        a.download = `${projectTitle.replace(/\s+/g, "-")}.jpg`;
+        a.download = fName;
+        document.body.appendChild(a);
         a.click();
+        document.body.removeChild(a);
+
         setTimeout(() => {
-          window.open("https://web.whatsapp.com", "_blank", "noopener,noreferrer");
+          const waUrl = `https://web.whatsapp.com/send?text=${encodeURIComponent("Check out my card!")}`;
+          window.open(waUrl, "_blank", "noopener,noreferrer");
         }, 800);
         toast({ title: "Card downloaded", description: "Share the file in WhatsApp Web that just opened." });
       }
