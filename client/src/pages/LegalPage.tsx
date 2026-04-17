@@ -120,28 +120,41 @@ function PrivacyContent() {
       </section>
 
       <section>
-        <h2 className="text-base font-semibold text-foreground mb-2">6. Your Rights</h2>
-        <p>You have the right to access, correct, or delete your personal data. To request deletion of your account and associated data, contact us at <a href={`mailto:${EMAIL}`} className="text-primary hover:underline">{EMAIL}</a>.</p>
+        <h2 className="text-base font-semibold text-foreground mb-2">6. Your Rights under GDPR and NDPR</h2>
+        <p>If you are a resident of the European Economic Area (EEA) or Nigeria, you have specific data protection rights under the GDPR and NDPR respectively:</p>
+        <ul className="list-disc pl-5 space-y-1 mt-2">
+          <li><strong>The right to access:</strong> You can request copies of your personal data.</li>
+          <li><strong>The right to rectification:</strong> You can request that we correct inaccurate information.</li>
+          <li><strong>The right to erasure (Right to be forgotten):</strong> You can request that we erase your personal data, under certain conditions.</li>
+          <li><strong>The right to restrict processing:</strong> You can request that we restrict the processing of your personal data.</li>
+          <li><strong>The right to data portability:</strong> You can request that we transfer the data that we have collected to another organization, or directly to you.</li>
+        </ul>
+        <p className="mt-2">To request deletion of your account and associated data, or exercise any of these rights, contact us at <a href={`mailto:${EMAIL}`} className="text-primary hover:underline">{EMAIL}</a>.</p>
       </section>
 
       <section>
-        <h2 className="text-base font-semibold text-foreground mb-2">7. Security</h2>
+        <h2 className="text-base font-semibold text-foreground mb-2">7. International Data Transfers</h2>
+        <p>CardCraft is hosted on international servers. By using our service, you consent to the transfer, storage, and processing of your information outside your country of residence, including to the United States and European Union, in accordance with GDPR and NDPR standards.</p>
+      </section>
+
+      <section>
+        <h2 className="text-base font-semibold text-foreground mb-2">8. Security</h2>
         <p>We implement industry-standard security measures including password hashing (bcrypt), secure session management, and HTTPS. However, no system is 100% secure — use a strong, unique password.</p>
       </section>
 
       <section>
-        <h2 className="text-base font-semibold text-foreground mb-2">8. Children's Privacy</h2>
-        <p>CardCraft is not directed to children under 13. We do not knowingly collect personal information from children.</p>
+        <h2 className="text-base font-semibold text-foreground mb-2">9. Children's Privacy (COPPA)</h2>
+        <p>CardCraft is not directed to children under 13. We do not knowingly collect personal information from children under 13. If you become aware that a child has provided us with personal data, please contact us.</p>
       </section>
 
       <section>
-        <h2 className="text-base font-semibold text-foreground mb-2">9. Changes</h2>
+        <h2 className="text-base font-semibold text-foreground mb-2">10. Changes</h2>
         <p>We may update this policy as our service evolves. We'll notify registered users of significant changes by email.</p>
       </section>
 
       <section>
-        <h2 className="text-base font-semibold text-foreground mb-2">10. Contact</h2>
-        <p>Privacy questions: <a href={`mailto:${EMAIL}`} className="text-primary hover:underline">{EMAIL}</a></p>
+        <h2 className="text-base font-semibold text-foreground mb-2">11. Contact & Data Controller</h2>
+        <p>For privacy questions or to reach our Data Protection Officer (DPO), please contact: <a href={`mailto:${EMAIL}`} className="text-primary hover:underline">{EMAIL}</a></p>
       </section>
     </div>
   );
