@@ -62,6 +62,7 @@ export async function initDb() {
   try {
     await qc`ALTER TABLE projects ADD COLUMN IF NOT EXISTS share_token TEXT`;
     await qc`ALTER TABLE projects ADD COLUMN IF NOT EXISTS share_enabled BOOLEAN DEFAULT FALSE`;
+    await qc`ALTER TABLE projects ADD COLUMN IF NOT EXISTS share_image TEXT`;
   } catch {
     // Columns may already exist on older Postgres versions without IF NOT EXISTS support.
   }
@@ -178,11 +179,16 @@ export class Storage {
     }).returning();
     return d;
   }
-  async enableProjectShare(id: number, userId: number): Promise<Project | undefined> {
+  async enableProjectShare(id: number, userId: number, shareImage?: string | null): Promise<Project | undefined> {
     const existing = await this.getProject(id);
     if (!existing || existing.userId !== userId) return undefined;
     const shareToken = existing.shareToken || crypto.randomBytes(24).toString("hex");
-    const [p] = await getDb().update(schema.projects).set({ shareEnabled: true, shareToken }).where(eq(schema.projects.id, id)).returning();
+    const patch: { shareEnabled: boolean; shareToken: string; shareImage?: string } = {
+      shareEnabled: true,
+      shareToken,
+    };
+    if (shareImage) patch.shareImage = shareImage;
+    const [p] = await getDb().update(schema.projects).set(patch).where(eq(schema.projects.id, id)).returning();
     return p;
   }
   async renameProject(id: number, userId: number, title: string): Promise<Project | undefined> { const existing = await this.getProject(id); if (!existing || existing.userId !== userId) return undefined; const [p] = await getDb().update(schema.projects).set({ title }).where(eq(schema.projects.id, id)).returning(); return p; }

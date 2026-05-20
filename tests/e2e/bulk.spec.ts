@@ -18,7 +18,9 @@ test("bulk generation loads CSV and generates cards", async ({ page }) => {
   await dismissCookieBanner(page);
 
   await page.getByTestId("select-template").click();
-  await page.getByRole("option", { name: /Test Template/i }).click();
+  const templateOption = page.getByRole("listbox").getByRole("option").first();
+  await expect(templateOption).toBeVisible();
+  await templateOption.click();
 
   await page.getByTestId("input-csv-upload").setInputFiles(csvPath);
   await expect(page.getByText("3 rows loaded")).toBeVisible();

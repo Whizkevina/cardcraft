@@ -34,9 +34,9 @@ export default function SharePage() {
 
   // Load Fabric.js via useFabric()
 
-  // Render canvas from designJson
+  // Render canvas from designJson (skip when a stored share snapshot exists)
   useEffect(() => {
-    if (!fabricLoaded || !card || !canvasRef.current || fabricRef.current) return;
+    if (!fabricLoaded || !card || card.shareImage || !canvasRef.current || fabricRef.current) return;
     const f = (window as any).fabric;
     try {
       const data = JSON.parse(card.designJson);
@@ -131,7 +131,20 @@ export default function SharePage() {
     }
   }, [fabricLoaded, card]);
 
+  useEffect(() => {
+    if (card?.shareImage) setRendered(true);
+  }, [card?.shareImage]);
+
   const handleDownload = () => {
+    if (card?.shareImage) {
+      const a = document.createElement("a");
+      a.href = card.shareImage;
+      a.download = `${(card.title || "card").replace(/\s+/g, "-")}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      return;
+    }
     if (!fabricRef.current) return;
     const url = fabricRef.current.toDataURL({ format: "png", quality: 0.95, multiplier: 2 });
     const a = document.createElement("a");
@@ -180,12 +193,23 @@ export default function SharePage() {
               <p className="text-xs text-muted-foreground">Designed with CardCraft</p>
             </div>
 
-            <div className="shadow-2xl rounded-sm overflow-hidden relative">
-              <canvas ref={canvasRef} />
-              {!rendered && (
-                <div className="absolute inset-0 flex items-center justify-center bg-background/60">
-                  <Loader2 size={24} className="animate-spin text-muted-foreground" />
-                </div>
+            <div className="shadow-2xl rounded-sm overflow-hidden relative max-w-full">
+              {card.shareImage ? (
+                <img
+                  src={card.shareImage}
+                  alt={card.title}
+                  className="max-w-full h-auto block"
+                  data-testid="share-image"
+                />
+              ) : (
+                <>
+                  <canvas ref={canvasRef} data-testid="share-canvas" />
+                  {!rendered && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-background/60">
+                      <Loader2 size={24} className="animate-spin text-muted-foreground" />
+                    </div>
+                  )}
+                </>
               )}
             </div>
 

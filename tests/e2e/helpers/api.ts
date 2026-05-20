@@ -1,6 +1,10 @@
 import type { APIRequestContext } from "@playwright/test";
 import type { TestUser } from "./user";
 
+/** 1×1 PNG for share snapshot tests */
+export const TEST_SHARE_IMAGE =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+
 export const createProjectViaApi = async (request: APIRequestContext, user: TestUser) => {
   const registerRes = await request.post("/api/auth/register", {
     data: { name: user.name, email: user.email, password: user.password },
@@ -26,7 +30,9 @@ export const createProjectViaApi = async (request: APIRequestContext, user: Test
 
   const project = await projectRes.json();
 
-  const shareRes = await request.post(`/api/projects/${project.id}/enable-share`);
+  const shareRes = await request.post(`/api/projects/${project.id}/enable-share`, {
+    data: { shareImage: TEST_SHARE_IMAGE },
+  });
   if (!shareRes.ok()) {
     throw new Error(`Enable share failed: ${shareRes.status()}`);
   }

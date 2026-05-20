@@ -271,7 +271,9 @@ cardcraft/
 | GET | `/api/projects` | List user's saved cards |
 | POST | `/api/projects` | Save a card |
 | POST | `/api/projects/:id/enable-share` | Enable public share link (auth required) |
-| GET | `/api/share/:token` | Public shared card view |
+| GET | `/api/share/:token` | Public shared card JSON (requires share enabled) |
+| GET | `/share/:token` | Public HTML page with Open Graph tags (redirects to app viewer) |
+| GET | `/share/:token/image.png` | Public PNG preview for social crawlers |
 | GET | `/api/pricing/quote` | Localized Pro price display (auto-detect country; charge remains NGN) |
 | POST | `/api/payments/initialize` | Start Paystack payment |
 | POST | `/api/payments/confirm` | Verify payment after popup closes |

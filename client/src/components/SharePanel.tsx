@@ -20,6 +20,9 @@ const EXPORT_PRESETS = [
   { label: "Portrait Flyer (1200×1500)", multiplier: 3 },
 ];
 
+/** Fixed multiplier for stored share snapshots (consistent link previews) */
+const SHARE_SNAPSHOT_MULTIPLIER = 2;
+
 interface SharePanelProps {
   fabricRef: React.RefObject<any>;
   projectTitle: string;
@@ -86,18 +89,20 @@ export function SharePanel({ fabricRef, projectTitle, projectId, onQROpen, svgTe
   };
 
   // Export to data URL (with optional watermark)
-  const getExportDataURL = (format: "png" | "jpeg"): string | null => {
+  const getExportDataURL = (format: "png" | "jpeg", multiplier = preset.multiplier): string | null => {
     const canvas = fabricRef.current;
     if (!canvas) return null;
     const f = (window as any).fabric;
     const currentZoom = canvas.getZoom();
     canvas.setZoom(1);
     const wm = applyWatermark(canvas, f);
-    const dataURL = canvas.toDataURL({ format, quality: 0.95, multiplier: preset.multiplier });
+    const dataURL = canvas.toDataURL({ format, quality: 0.95, multiplier });
     removeWatermark(canvas, wm);
     canvas.setZoom(currentZoom);
     return dataURL;
   };
+
+  const getShareSnapshotDataURL = (): string | null => getExportDataURL("png", SHARE_SNAPSHOT_MULTIPLIER);
 
   const getExportSVG = async (): Promise<string | null> => {
     const canvas = fabricRef.current;
@@ -231,14 +236,20 @@ export function SharePanel({ fabricRef, projectTitle, projectId, onQROpen, svgTe
 
   // Copy shareable link — public /share/:token if saved, else editor URL
   const copyLink = async () => {
-    const base = window.location.origin + window.location.pathname.replace(/index\.html$/, "");
     if (projectId) {
       try {
-        const res = await apiRequest("POST", `/api/projects/${projectId}/enable-share`);
+        const shareImage = getShareSnapshotDataURL();
+        if (!shareImage) {
+          toast({ title: "Card not ready", description: "Wait for the canvas to load, then try again.", variant: "destructive" });
+          return;
+        }
+        const res = await apiRequest("POST", `/api/projects/${projectId}/enable-share`, { shareImage });
         const data = await res.json();
-        const url = `${base}#/share/${data.shareToken}`;
+        const appBase = (import.meta.env.VITE_APP_URL as string | undefined)?.replace(/\/$/, "")
+          || `${window.location.origin}${window.location.pathname.replace(/\/index\.html$/, "").replace(/\/$/, "")}`;
+        const url = `${appBase}/share/${data.shareToken}`;
         await navigator.clipboard.writeText(url);
-        toast({ title: "Link copied!", description: "Anyone with this link can view the card." });
+        toast({ title: "Link copied!", description: "Anyone with this link can view your card." });
         return;
       } catch {
         toast({ title: "Copy failed", variant: "destructive" });

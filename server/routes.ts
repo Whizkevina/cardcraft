@@ -14,6 +14,7 @@ import validator from "validator";
 import { FREE_DOWNLOAD_LIMIT, FREE_PROJECT_LIMIT, PRO_PRICE_KOBO, PRO_PRICE_NGN } from "@shared/schema";
 import { getPaystackPublic, getPaystackSecret, getSessionSecret } from "./env";
 import { buildPricingQuote } from "./pricing";
+import { registerSharePublicRoutes } from "./sharePublic";
 
 declare module "express-session" {
   interface SessionData {
@@ -57,6 +58,17 @@ function sanitiseTemplateBody(body: any) {
 function sanitiseProjectBody(body: any) {
   const { title, designJson, exportSettings, thumbnail, templateId } = body;
   return { title, designJson, exportSettings, thumbnail, templateId };
+}
+
+const SHARE_IMAGE_MAX_LENGTH = 2_800_000;
+
+/** Accept PNG data URLs captured from the editor canvas at share time */
+function parseShareImage(raw: unknown): string | null {
+  if (raw == null || raw === "") return null;
+  const value = String(raw);
+  if (!value.startsWith("data:image/png;base64,")) return null;
+  if (value.length > SHARE_IMAGE_MAX_LENGTH) return null;
+  return value;
 }
 
 /** Normalise an email address */
@@ -216,6 +228,9 @@ const isLocalRequest = (req: any) => {
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
   // Initialize database
   await initDb();
+
+  // Public share pages for crawlers (OG tags) — before SPA catch-all
+  registerSharePublicRoutes(app);
 
   // Session — secure cookie in production
   // PostgreSQL-backed session store via Supabase (using pg Pool for compatibility)
@@ -601,9 +616,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.post("/api/projects/:id/enable-share", requireAuth, async (req, res) => {
     const id = safeId(req.params.id);
     if (!id) return res.status(400).json({ error: "Invalid ID" });
-    const project = await storage.enableProjectShare(id, req.session.userId!);
+    const shareImage = parseShareImage(req.body?.shareImage);
+    if (req.body?.shareImage && !shareImage) {
+      return res.status(400).json({ error: "shareImage must be a PNG data URL under 2MB" });
+    }
+    const project = await storage.enableProjectShare(id, req.session.userId!, shareImage);
     if (!project) return res.status(404).json({ error: "Not found" });
-    res.json({ shareToken: project.shareToken, shareEnabled: project.shareEnabled });
+    res.json({
+      shareToken: project.shareToken,
+      shareEnabled: project.shareEnabled,
+      shareImageStored: Boolean(project.shareImage),
+    });
   });
 
   app.patch("/api/projects/:id/rename", requireAuth, async (req, res) => {
@@ -627,6 +650,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       title: p.title,
       designJson: p.designJson,
       thumbnail: p.thumbnail,
+      shareImage: p.shareImage,
       updatedAt: p.updatedAt,
     });
   });

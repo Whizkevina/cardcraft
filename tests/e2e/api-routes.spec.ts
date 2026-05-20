@@ -65,13 +65,28 @@ test.describe("API routes", () => {
     const privateShare = await request.get(`/api/share/${project.shareToken}`);
     expect(privateShare.status()).toBe(404);
 
-    const enableRes = await request.post(`/api/projects/${project.id}/enable-share`);
+    const enableRes = await request.post(`/api/projects/${project.id}/enable-share`, {
+      data: { shareImage: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==" },
+    });
     expect(enableRes.ok()).toBeTruthy();
     const shareData = await enableRes.json();
+    expect(shareData.shareImageStored).toBe(true);
 
     const publicShare = await request.get(`/api/share/${shareData.shareToken}`);
     expect(publicShare.ok()).toBeTruthy();
     const payload = await publicShare.json();
     expect(payload.title).toBe("Private Share Test");
+    expect(payload.shareImage).toMatch(/^data:image\/png;base64,/);
+
+    const ogPage = await request.get(`/share/${shareData.shareToken}`);
+    expect(ogPage.ok()).toBeTruthy();
+    expect(ogPage.headers()["content-type"]).toContain("text/html");
+    const html = await ogPage.text();
+    expect(html).toContain(`og:image`);
+    expect(html).toContain(`/share/${shareData.shareToken}/image.png`);
+
+    const ogImage = await request.get(`/share/${shareData.shareToken}/image.png`);
+    expect(ogImage.ok()).toBeTruthy();
+    expect(ogImage.headers()["content-type"]).toMatch(/image\/(png|jpeg)/);
   });
 });

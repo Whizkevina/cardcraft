@@ -49,6 +49,7 @@ export const projects = pgTable("projects", {
   designJson: text("design_json").notNull(),
   exportSettings: text("export_settings").notNull().default("{}"),
   thumbnail: text("thumbnail"),
+  shareImage: text("share_image"),
   shareToken: text("share_token"),
   shareEnabled: boolean("share_enabled").notNull().default(false),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
