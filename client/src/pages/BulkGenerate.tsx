@@ -1,12 +1,15 @@
 import { useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "../components/AuthProvider";
 import Navbar from "../components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { colorSwatchDataUri } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { loadFabric } from "@/lib/loadFabric";
 import { Upload, Download, Layers, FileText, CheckCircle, XCircle, Loader2, Play } from "lucide-react";
 import type { Template } from "@shared/schema";
 
@@ -28,10 +31,10 @@ Alex Johnson,Happy Birthday,May 1 2026,Celebrating you today
 `;
 
 export default function BulkGenerate() {
+  const { user, isPro, isLoading: authLoading } = useAuth();
   const [templateId, setTemplateId] = useState<string>("");
   const [rows, setRows] = useState<BulkRow[]>([]);
   const [generating, setGenerating] = useState(false);
-  const [fabricLoaded, setFabricLoaded] = useState(false);
   const hiddenCanvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
 
@@ -42,17 +45,6 @@ export default function BulkGenerate() {
       return res.json();
     },
   });
-
-  // Load fabric.js
-  const ensureFabric = (): Promise<void> => {
-    return new Promise(resolve => {
-      if ((window as any).fabric) { resolve(); return; }
-      const script = document.createElement("script");
-      script.src = "https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js";
-      script.onload = () => { setFabricLoaded(true); resolve(); };
-      document.head.appendChild(script);
-    });
-  };
 
   const parseCSV = (text: string): BulkRow[] => {
     const lines = text.trim().split("\n");
@@ -89,7 +81,7 @@ export default function BulkGenerate() {
   };
 
   const generateCard = async (row: BulkRow, template: Template): Promise<string> => {
-    await ensureFabric();
+    await loadFabric();
     const f = (window as any).fabric;
 
     return new Promise((resolve, reject) => {
@@ -156,7 +148,8 @@ export default function BulkGenerate() {
                 fabricImg.moveTo(frameIndex);
                 res();
               };
-              imgElement.onerror = () => res(); 
+              imgElement.onerror = () => res();
+              if (!row.image) return res();
               imgElement.src = row.image;
             });
           } else if (row.name) {
@@ -239,6 +232,28 @@ export default function BulkGenerate() {
   };
 
   const doneCount = rows.filter(r => r.status === "done").length;
+
+  if (authLoading) return null;
+
+  if (!user || !isPro) {
+    return (
+      <div className="min-h-screen">
+        <Navbar />
+        <main className="max-w-md mx-auto px-4 py-20 text-center">
+          <Layers size={40} className="mx-auto text-muted-foreground mb-4" />
+          <h2 className="text-xl font-bold mb-2">Pro feature</h2>
+          <p className="text-muted-foreground text-sm mb-6">
+            Bulk card generation is available on the Pro plan. Upgrade to generate personalized cards from CSV.
+          </p>
+          {!user ? (
+            <Link href="/auth"><Button className="bg-primary text-primary-foreground hover:bg-primary/90">Sign In</Button></Link>
+          ) : (
+            <Link href="/pricing"><Button className="bg-primary text-primary-foreground hover:bg-primary/90">Upgrade to Pro</Button></Link>
+          )}
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">

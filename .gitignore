@@ -13,6 +13,7 @@ dist/
 .env
 .env.local
 .env.production
+.env.test
 
 # OS files
 .DS_Store
@@ -32,6 +33,10 @@ npm-debug.log*
 pids
 *.pid
 *.seed
+
+# Test artifacts
+test-results/
+playwright-report/
 
 # Optional: uploaded assets cache
 uploads/

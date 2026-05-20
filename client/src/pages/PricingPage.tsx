@@ -7,23 +7,24 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { CheckCircle, Sparkles, Zap, Crown, Loader2, Lock } from "lucide-react";
+import { usePricingQuote } from "@/hooks/usePricingQuote";
 
 const FREE_FEATURES = [
-  "All 20 card templates",
+  "All free templates",
   "Full canvas editor",
   "Photo upload & bg removal",
   "QR code layer",
   "3 downloads per day",
   "CardCraft watermark on exports",
   "Save up to 5 cards",
+  "Email delivery (sign in required)",
 ];
 
 const PRO_FEATURES = [
   "Everything in Free",
   "Unlimited downloads — no cap",
   "No watermark on exports",
-  "Priority support",
-  "Early access to new templates",
+  "Unlimited saved cards",
   "Bulk card generator (CSV upload)",
   "Lifetime access — pay once",
 ];
@@ -38,6 +39,7 @@ export default function PricingPage() {
   const { user, isPro, isLoading } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
+  const { quote } = usePricingQuote();
   const [paying, setPaying] = useState(false);
 
   const loadPaystackScript = (): Promise<void> => {
@@ -118,8 +120,13 @@ export default function PricingPage() {
             Pay once. Use forever.
           </h1>
           <p className="text-muted-foreground max-w-md mx-auto">
-            No subscriptions, no recurring fees. Pay ₦10,000 once and get unlimited access for life.
+            No subscriptions, no recurring fees. Pay {quote.proPrice.formatted} once and get unlimited access for life.
           </p>
+          {quote.approximate && (
+            <p className="text-xs text-muted-foreground max-w-lg mx-auto mt-3" data-testid="pricing-fx-disclaimer">
+              Price shown in {quote.currency} for your region. Checkout charges {quote.charge.formatted} via Paystack; your bank may apply its own exchange rate.
+            </p>
+          )}
         </div>
 
         {/* Pricing cards */}
@@ -129,7 +136,7 @@ export default function PricingPage() {
           <div className="bg-card border border-border rounded-2xl p-6">
             <div className="mb-4">
               <p className="text-sm font-medium text-muted-foreground mb-1">Free</p>
-              <p className="text-4xl font-bold">₦0</p>
+              <p className="text-4xl font-bold" data-testid="price-free">{quote.freePrice.formatted}</p>
               <p className="text-xs text-muted-foreground mt-1">Always free</p>
             </div>
             <ul className="space-y-2.5 mb-6">
@@ -160,7 +167,7 @@ export default function PricingPage() {
             <div className="mb-4">
               <p className="text-sm font-medium text-gold mb-1">Pro — Lifetime</p>
               <div className="flex items-end gap-2">
-                <p className="text-4xl font-bold">₦10,000</p>
+                <p className="text-4xl font-bold" data-testid="price-pro">{quote.proPrice.formatted}</p>
                 <p className="text-muted-foreground text-sm mb-1">once</p>
               </div>
               <p className="text-xs text-muted-foreground mt-1">Pay once, use forever. No subscription.</p>
@@ -187,7 +194,7 @@ export default function PricingPage() {
               >
                 {paying
                   ? <><Loader2 size={15} className="animate-spin" /> Processing...</>
-                  : <><Zap size={15} /> Upgrade to Pro — ₦10,000</>
+                  : <><Zap size={15} /> Upgrade to Pro — {quote.proPrice.formatted}</>
                 }
               </Button>
             )}

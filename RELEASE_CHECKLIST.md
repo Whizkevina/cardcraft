@@ -8,23 +8,28 @@ Use this checklist before every production deployment. Items marked 🔴 are blo
 
 | Variable | Status | Notes |
 |---|---|---|
+| `DATABASE_URL` | 🔴 Required | PostgreSQL connection string (Supabase, Railway Postgres, etc.) |
 | `SESSION_SECRET` | 🔴 Required | Min 32 random chars. Use `openssl rand -hex 32` |
 | `PAYSTACK_SECRET_KEY` | 🔴 Required for payments | `sk_live_...` from Paystack dashboard |
 | `PAYSTACK_PUBLIC_KEY` | 🔴 Required for payments | `pk_live_...` from Paystack dashboard |
 | `GMAIL_USER` | 🔴 Required for email | Full Gmail address |
 | `GMAIL_APP_PASSWORD` | 🔴 Required for email | 16-char App Password (not Gmail password) |
 | `APP_URL` | 🔴 Required | Your deployed domain e.g. `https://cardcraft.app` |
-| `NODE_ENV` | 🔴 Must be `production` | Enables HTTPS cookies, hides stack traces |
+| `NODE_ENV` | 🔴 Must be `production` | Enables HTTPS cookies, hides stack traces, validates secrets |
+| `VITE_GOOGLE_CLIENT_ID` | Optional | Required for Google Sign-In |
+| Email/password auth | 🔴 Required for email features | Send by Email and password reset require a signed-in account |
+
+Copy [`.env.example`](.env.example) to `.env.local` locally; set all variables on your hosting platform for production.
 
 ---
 
 ## 2. Infrastructure
 
 - [ ] 🔴 App is served over **HTTPS** — required for `cookie.secure = true`
-- [ ] 🔴 **SQLite database file** is stored on a persistent volume (Railway: add Volume, mount at `/app`)
-- [ ] Database file path is writable by the Node.js process
-- [ ] Server has at least **512 MB RAM** (bcrypt + fabric.js canvas processing)
-- [ ] **PM2** or equivalent process manager is running (restarts on crash)
+- [ ] 🔴 **PostgreSQL** database is provisioned and reachable from the app
+- [ ] Session store uses **connect-pg-simple** (sessions table created on startup)
+- [ ] Server has at least **512 MB RAM** (bcrypt + canvas processing)
+- [ ] Process manager configured (Railway/Render auto-restart, or PM2 on VPS)
 - [ ] Log retention configured — logs do not grow unbounded
 
 ---
@@ -33,24 +38,24 @@ Use this checklist before every production deployment. Items marked 🔴 are blo
 
 - [ ] 🔴 Verify `Content-Security-Policy` header is present: `curl -I https://your-domain.com/api/auth/me | grep Content-Security`
 - [ ] 🔴 Verify `Strict-Transport-Security` header present (HTTPS required first)
-- [ ] 🔴 Confirm `SESSION_SECRET` is **not** the default `cardcraft-secret-2024`
+- [ ] 🔴 Confirm `SESSION_SECRET` is **not** the default fallback value
 - [ ] 🔴 Confirm `cookie.secure = true` by checking Set-Cookie response header includes `Secure`
-- [ ] Rate limiting active — test with `for i in $(seq 15); do curl -s -o /dev/null -w "%{http_code}\n" -X POST https://your-domain.com/api/auth/login -H "Content-Type: application/json" -d '{"email":"x","password":"y"}'; done` — should return 429 after 10 attempts
-- [ ] Paystack webhook URL registered in Paystack dashboard: `https://your-domain.com/api/payments/webhook`
+- [ ] Rate limiting active — test login endpoint returns 429 after repeated attempts
+- [ ] Paystack webhook URL registered: `https://your-domain.com/api/payments/webhook`
 - [ ] Paystack test mode → live mode toggle confirmed in Paystack dashboard
-- [ ] Admin seed endpoint tested and default password changed: `POST /api/admin/seed` then immediately change password from Account Settings
+- [ ] Public share links use secure tokens (`/share/:token`), not numeric IDs
 - [ ] Reset token flow tested end-to-end
 
 ---
 
 ## 4. First-Time Setup
 
-- [ ] 🔴 `POST /api/admin/seed` — creates `admin@cardcraft.com` / `admin123`
-- [ ] 🔴 Sign in as admin and **change the default password** immediately (Account Settings)
-- [ ] Verify all 20 templates loaded: `GET /api/templates` should return 20 items
+- [ ] Create admin user via local seed (`POST /api/admin/seed` — **local dev only**; disabled in production) or direct DB insert in production
+- [ ] Sign in as admin and **change the default password** immediately
+- [ ] Verify templates loaded: `GET /api/templates`
 - [ ] Test a card download (free tier) — watermark should appear
-- [ ] Create a test account, verify 3-download limit
-- [ ] Test Paystack payment with test keys first (sandbox), then switch to live
+- [ ] Create a test account, verify 3-download limit (including guest sessions)
+- [ ] Test Paystack payment with test keys first, then switch to live
 
 ---
 
@@ -67,63 +72,56 @@ Run these manually after each deployment:
 - [ ] Change password from Account Settings
 
 **Editor**
-- [ ] Open Royal Elegance template → canvas renders
+- [ ] Open a template → canvas renders
 - [ ] Upload a photo → appears on canvas
 - [ ] Edit name text → updates in real time
-- [ ] Remove background → works on plain background photo
-- [ ] Add QR code → generates and lands on canvas
-- [ ] Download PNG → file downloads
-- [ ] Download JPG → file downloads
-- [ ] Send by Email → card delivered to inbox
+- [ ] Download PNG / JPG / SVG → files download
+- [ ] Send by Email (signed in) → card delivered or simulated
 - [ ] Undo / Redo → works correctly
 
 **Gallery**
-- [ ] All 20 templates visible
-- [ ] Category filters work
-- [ ] Search filters templates correctly
-- [ ] Preview modal opens before entering editor
+- [ ] Templates visible with category filters
+- [ ] Pro templates show lock for free users
 
 **Payments**
 - [ ] Paystack popup opens with correct amount (₦10,000)
 - [ ] Test payment completes → account upgrades to Pro
-- [ ] Pro account: no watermark on download
-- [ ] Pro account: no download limit
+- [ ] Pro account: no watermark, no download limit
 - [ ] Payment shows in `/payments` page
 
 **Admin Panel**
 - [ ] Analytics tab shows correct counts
 - [ ] Toggle user Free ↔ Pro reflects immediately
-- [ ] Create new template → appears in gallery after publishing
-- [ ] Unpublish template → disappears from gallery
+- [ ] Create/publish template → appears in gallery
 
-**Bulk Generator**
-- [ ] Download sample CSV → correct format
-- [ ] Upload CSV → rows appear in table
-- [ ] Generate All → cards generated per row
-- [ ] Download All → files download
+**Bulk Generator (Pro only)**
+- [ ] Free user sees upgrade prompt
+- [ ] Pro user can upload CSV and generate cards
 
 ---
 
-## 6. Performance Baselines
+## 6. Automated Tests
 
-- [ ] Home page loads in < 3 seconds on 4G mobile
-- [ ] Gallery loads 20 templates in < 2 seconds
-- [ ] Editor canvas ready in < 5 seconds (Fabric.js loads from CDN)
-- [ ] `/api/admin/analytics` responds in < 200 ms (now uses SQL aggregates)
+```bash
+npm run test:unit   # Vitest component + utility tests
+npm run test:e2e    # Playwright end-to-end (requires DATABASE_URL in .env.test)
+npm test            # Both suites
+```
+
+CI runs on push/PR via [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 ---
 
-## 7. Known Limitations (Non-blockers, document for future)
+## 7. Known Limitations (Non-blockers)
 
 | Item | Impact | Future fix |
 |---|---|---|
-| SQLite single-file database | Scales to ~10k concurrent users before bottleneck | Migrate to PostgreSQL when traffic demands |
-| MemoryStore for sessions | Sessions lost on server restart; not multi-instance safe | Add Redis or connect-sqlite3 session store |
-| Email via Gmail SMTP | 500 emails/day limit on standard Gmail | Switch to SendGrid/Resend API at volume |
-| `unsafe-inline` in CSP | Vite injects inline scripts | Replace with nonce-based CSP at scale |
-| No i18n | English-only UI | Add react-i18next for Yoruba, Hausa, Igbo, Arabic support |
-| bcrypt async on main thread | Blocks event loop for ~100ms during login | Offload to worker thread at high traffic |
-| No automated tests | Regressions caught manually | Add Vitest unit tests, Playwright E2E suite |
+| Email via Gmail SMTP | 500 emails/day limit on standard Gmail | Switch to SendGrid/Resend at volume |
+| `unsafe-inline` in CSP | Vite injects inline scripts | Nonce-based CSP at scale |
+| No i18n | English-only UI | react-i18next for additional languages |
+| Client-side export | No server-side render pipeline | Headless export service if needed |
+| Background removal | Heuristic corner-color removal in the editor | Integrate dedicated API if quality needed |
+| Fabric.js version | Pinned to 5.3.1 CDN (matches template JSON format) | Evaluate Fabric 7 migration separately |
 
 ---
 
@@ -139,19 +137,14 @@ npm run build
 pm2 restart cardcraft
 ```
 
-Always back up `cardcraft.db` before deploying:
-```bash
-cp cardcraft.db cardcraft.db.backup-$(date +%Y%m%d-%H%M)
-```
-
 ---
 
 ## 9. Monitoring (Recommended)
 
 - [ ] Set up **UptimeRobot** (free) to ping `https://your-domain.com/api/auth/me` every 5 minutes
-- [ ] Configure Railway/Render to send email on deploy failure
-- [ ] Watch Railway logs for repeated 401/403/429 spikes (indicates attack attempts)
+- [ ] Configure hosting platform alerts on deploy failure
+- [ ] Watch logs for repeated 401/403/429 spikes
 
 ---
 
-*Last reviewed: April 9, 2026*
+*Last reviewed: May 2026*

@@ -9,17 +9,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
+import { applySvgTextMode, type SvgTextMode } from "@/lib/svgTextExport";
 import {
   ArrowLeft, Download, Save, Upload, Type, Palette, Layers,
   AlignLeft, AlignCenter, AlignRight, Bold, Italic,
   ChevronUp, ChevronDown, Lock, Unlock, Trash2,
   Image as ImageIcon, RotateCcw, X, Undo2, Redo2,
   ZoomIn, ZoomOut, Maximize, Wand2, Loader2 as SpinIcon,
-  RefreshCw, MousePointer, Grid3x3
+  RefreshCw, MousePointer, Grid3x3, Crown
 } from "lucide-react";
 import type { Template, Project } from "@shared/schema";
 import { SharePanel } from "../components/SharePanel";
 import { QRDialog } from "../components/QRDialog";
+import { useFabric } from "@/hooks/useFabric";
 
 const FONTS = ["Georgia", "Arial", "Times New Roman", "Trebuchet MS", "Verdana", "Impact", "Great Vibes", "Courier New", "Tahoma", "Palatino", "Comic Sans MS", "Oswald", "Lucida Console", "Garamond"];
 
@@ -87,7 +89,7 @@ export default function Editor() {
   const historyIndexRef = useRef<number>(-1);
   const isHistoryActionRef = useRef(false);
 
-  const [fabricLoaded, setFabricLoaded] = useState(false);
+  const { fabricLoaded } = useFabric();
   const [canvasReady, setCanvasReady] = useState(false);
   const [selectedObj, setSelectedObj] = useState<any>(null);
   const [projectTitle, setProjectTitle] = useState("Untitled Card");
@@ -98,6 +100,7 @@ export default function Editor() {
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [exportPreset, setExportPreset] = useState(EXPORT_PRESETS[0]);
+  const [svgTextMode, setSvgTextMode] = useState<SvgTextMode>("embed");
   const [isDirty, setIsDirty] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [showGrid, setShowGrid] = useState(false);
@@ -108,13 +111,21 @@ export default function Editor() {
   const templateId = params.templateId || null;
   const editProjectId = params.projectId || null;
 
-  const { data: template } = useQuery<Template>({
+  const { data: template, error: templateError, isError: templateLoadError, isLoading: templateLoading } = useQuery<Template>({
     queryKey: ["/api/templates", templateId],
     queryFn: async () => {
-      const res = await apiRequest("GET", `/api/templates/${templateId}`);
-      return res.json();
+      const res = await fetch(`/api/templates/${templateId}`, { credentials: "include" });
+      const body = await res.json().catch(() => ({}));
+      if (res.status === 403) {
+        const err = new Error(body.error || "This template requires Pro.") as Error & { code?: string };
+        err.code = body.code;
+        throw err;
+      }
+      if (!res.ok) throw new Error(body.error || "Failed to load template");
+      return body;
     },
     enabled: !!templateId,
+    retry: false,
   });
 
   const { data: project } = useQuery<Project>({
@@ -126,14 +137,7 @@ export default function Editor() {
     enabled: !!editProjectId,
   });
 
-  // ─── Load Fabric.js ───────────────────────────────────────────────────────
-  useEffect(() => {
-    if ((window as any).fabric) { setFabricLoaded(true); return; }
-    const script = document.createElement("script");
-    script.src = "https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js";
-    script.onload = () => setFabricLoaded(true);
-    document.head.appendChild(script);
-  }, []);
+  // Fabric.js is loaded on demand via useFabric() / loadFabric()
 
   // ─── History helpers ──────────────────────────────────────────────────────
   const saveHistory = useCallback(() => {
@@ -177,6 +181,9 @@ export default function Editor() {
   // ─── Init canvas ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!fabricLoaded || !canvasRef.current || fabricRef.current) return;
+    if (templateId && templateLoading) return;
+    if (templateId && templateLoadError) return;
+    if (editProjectId && !project) return;
     const f = (window as any).fabric;
     const canvas = new f.Canvas(canvasRef.current, {
       width: CANVAS_W,
@@ -230,8 +237,12 @@ export default function Editor() {
     });
 
     setCanvasReady(true);
-    return () => { canvas.dispose(); fabricRef.current = null; };
-  }, [fabricLoaded, saveHistory]);
+    return () => {
+      canvas.dispose();
+      fabricRef.current = null;
+      setCanvasReady(false);
+    };
+  }, [fabricLoaded, templateId, editProjectId, templateLoading, templateLoadError, project, saveHistory]);
 
   // ─── Load template / project ──────────────────────────────────────────────
   useEffect(() => {
@@ -881,7 +892,7 @@ export default function Editor() {
     },
     onSuccess: (data: any) => {
       if (data?.id && !projectId) setProjectId(data.id);
-      qc.invalidateQueries({ queryKey: ["/api/projects"] });
+      qc.refetchQueries({ queryKey: ["/api/projects"] });
       setIsDirty(false);
       toast({ title: "Saved!", description: "Your card has been saved." });
     },
@@ -920,7 +931,7 @@ export default function Editor() {
   };
 
   // ─── Export ───────────────────────────────────────────────────────────────
-  const exportCard = async (format: "png" | "jpeg") => {
+  const exportCard = async (format: "png" | "jpeg" | "svg") => {
     const canvas = fabricRef.current;
     if (!canvas) return;
 
@@ -937,7 +948,12 @@ export default function Editor() {
         return;
       }
     } catch {
-      // Fail open on transient network issues so export is still possible.
+      toast({
+        title: "Could not verify download limit",
+        description: "Check your connection and try again.",
+        variant: "destructive",
+      });
+      return;
     }
 
     const currentZoom = canvas.getZoom();
@@ -962,7 +978,30 @@ export default function Editor() {
       canvas.renderAll();
     }
 
-    const dataURL = canvas.toDataURL({ format, quality: 0.95, multiplier: exportPreset.multiplier });
+    let href = "";
+    let extension = format === "jpeg" ? "jpg" : format;
+
+    if (format === "svg") {
+      const width = Math.round(canvas.width * exportPreset.multiplier);
+      const height = Math.round(canvas.height * exportPreset.multiplier);
+      let svg = canvas.toSVG({ suppressPreamble: false });
+      svg = svg.replace(/<svg([^>]*)>/, (_match: string, attrs: string) => {
+        const cleaned = attrs
+          .replace(/\swidth="[^"]*"/g, "")
+          .replace(/\sheight="[^"]*"/g, "")
+          .replace(/\sviewBox="[^"]*"/g, "");
+        return `<svg${cleaned} width="${width}" height="${height}" viewBox="0 0 ${canvas.width} ${canvas.height}">`;
+      });
+      try {
+        svg = await applySvgTextMode(svg, svgTextMode);
+      } catch (err) {
+        console.error("[Editor] SVG text mode failed, exporting raw SVG:", err);
+      }
+      const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+      href = URL.createObjectURL(blob);
+    } else {
+      href = canvas.toDataURL({ format, quality: 0.95, multiplier: exportPreset.multiplier });
+    }
 
     if (wm) {
       canvas.remove(wm);
@@ -971,9 +1010,10 @@ export default function Editor() {
 
     canvas.setZoom(currentZoom);
     const a = document.createElement("a");
-    a.href = dataURL;
-    a.download = `${projectTitle.replace(/\s+/g, "-")}-${exportPreset.label.split(" ")[0].toLowerCase()}.${format === "jpeg" ? "jpg" : "png"}`;
+    a.href = href;
+    a.download = `${projectTitle.replace(/\s+/g, "-")}-${exportPreset.label.split(" ")[0].toLowerCase()}.${extension}`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    if (format === "svg") URL.revokeObjectURL(href);
 
     const remaining = user && !isPro
       ? `${Math.max(0, 3 - ((user.downloadsToday || 0) + 1))} free downloads remaining today`
@@ -1023,6 +1063,41 @@ export default function Editor() {
   const fillColor = typeof rawFill === "string" ? rawFill : "#FFFFFF"; // Protect against gradient objects
   const isLocked = selectedObj?.selectable === false;
   const opacity = selectedObj?.opacity !== undefined ? Math.round(selectedObj.opacity * 100) : 100;
+
+  if (templateId && templateLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background">
+        <SpinIcon className="animate-spin text-primary" size={28} />
+      </div>
+    );
+  }
+
+  if (templateId && templateLoadError) {
+    const isProTemplate = (templateError as Error & { code?: string })?.code === "PRO_TEMPLATE";
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-background px-4 text-center">
+        <Lock size={36} className="text-primary mb-4" />
+        <h2 className="text-xl font-bold mb-2">{isProTemplate ? "Pro template" : "Template unavailable"}</h2>
+        <p className="text-muted-foreground text-sm max-w-md mb-6">
+          {isProTemplate
+            ? "This design is part of the Pro template collection. Upgrade to customize and export it."
+            : templateError?.message || "We couldn't load this template."}
+        </p>
+        <div className="flex gap-3">
+          <Link href="/templates">
+            <Button variant="outline">Back to templates</Button>
+          </Link>
+          {isProTemplate && (
+            <Link href="/pricing">
+              <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
+                <Crown size={14} /> Upgrade to Pro
+              </Button>
+            </Link>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-background">
@@ -1077,6 +1152,9 @@ export default function Editor() {
           </Button>
           <Button size="sm" variant="ghost" onClick={() => exportCard("jpeg")} className="gap-1.5 text-xs h-8 hidden sm:flex" data-testid="button-export-jpg">
             <Download size={13} /> JPG
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => exportCard("svg")} className="gap-1.5 text-xs h-8 hidden sm:flex" data-testid="button-export-svg">
+            <Download size={13} /> SVG
           </Button>
           {user ? (
             <Button size="sm" onClick={() => saveProject.mutate()} disabled={saveProject.isPending}
@@ -1430,7 +1508,14 @@ export default function Editor() {
 
             {/* ── Export & Share tab ───────────────────────────────────── */}
             <TabsContent value="export" className="flex-1 p-3 mt-0 overflow-y-auto">
-              <SharePanel fabricRef={fabricRef} projectTitle={projectTitle} projectId={projectId} onQROpen={() => setQrOpen(true)} />
+              <SharePanel
+                fabricRef={fabricRef}
+                projectTitle={projectTitle}
+                projectId={projectId}
+                onQROpen={() => setQrOpen(true)}
+                svgTextMode={svgTextMode}
+                onSvgTextModeChange={setSvgTextMode}
+              />
             </TabsContent>
           </Tabs>
         </aside>
@@ -1506,7 +1591,14 @@ export default function Editor() {
 
             {mobilePanel === "export" && (
               <div>
-                <SharePanel fabricRef={fabricRef} projectTitle={projectTitle} projectId={projectId} onQROpen={() => { setMobilePanel(null); setQrOpen(true); }} />
+                <SharePanel
+                  fabricRef={fabricRef}
+                  projectTitle={projectTitle}
+                  projectId={projectId}
+                  onQROpen={() => { setMobilePanel(null); setQrOpen(true); }}
+                  svgTextMode={svgTextMode}
+                  onSvgTextModeChange={setSvgTextMode}
+                />
               </div>
             )}
             </div>{/* overflow scroll end */}

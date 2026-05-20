@@ -1,12 +1,15 @@
 import Navbar from "../components/Navbar";
 import { useLocation } from "wouter";
 import { Shield, FileText } from "lucide-react";
+import { usePricingQuote } from "@/hooks/usePricingQuote";
 
 const LAST_UPDATED = "April 9, 2026";
 const COMPANY = "CardCraft";
 const EMAIL = "support@cardcraft.app";
 
 function TermsContent() {
+  const { quote } = usePricingQuote();
+
   return (
     <div className="prose prose-sm dark:prose-invert max-w-none space-y-6 text-sm text-muted-foreground leading-relaxed">
       <p>By using CardCraft you agree to these Terms of Service. Please read them carefully.</p>
@@ -23,7 +26,7 @@ function TermsContent() {
 
       <section>
         <h2 className="text-base font-semibold text-foreground mb-2">3. Free and Pro Plans</h2>
-        <p>Free accounts may download up to 3 cards per day with a CardCraft watermark. Pro accounts (₦10,000 one-time payment) receive unlimited downloads with no watermark. Payment is non-refundable after the account has been upgraded.</p>
+        <p>Free accounts may download up to 3 cards per day with a CardCraft watermark. Pro accounts ({quote.proPrice.formatted} one-time payment, charged as {quote.charge.formatted}) receive unlimited downloads with no watermark. Payment is non-refundable after the account has been upgraded.</p>
       </section>
 
       <section>
@@ -49,7 +52,7 @@ function TermsContent() {
 
       <section>
         <h2 className="text-base font-semibold text-foreground mb-2">7. Payments</h2>
-        <p>Payments are processed by Paystack, a secure third-party payment processor. CardCraft does not store your card details. All transactions are in Nigerian Naira (NGN). The Pro plan is a one-time lifetime purchase — there are no recurring charges.</p>
+        <p>Payments are processed by Paystack, a secure third-party payment processor. CardCraft does not store your card details. All transactions are settled in Nigerian Naira (NGN); localized prices on the site are approximate conversions for your region. The Pro plan is a one-time lifetime purchase — there are no recurring charges.</p>
       </section>
 
       <section>

@@ -1,12 +1,14 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "../components/AuthProvider";
 import Navbar from "../components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import { Sparkles, ArrowRight, Palette, GraduationCap, Church, Building2, Search, X, Heart } from "lucide-react";
+import { Sparkles, ArrowRight, Palette, GraduationCap, Church, Building2, Search, X, Heart, Crown, Lock } from "lucide-react";
+import { Link } from "wouter";
 import type { Template } from "@shared/schema";
 
 const CATEGORIES = [
@@ -85,7 +87,7 @@ const previewBarWidthClass = (percentage: number) => {
 };
 
 // ─── Preview modal ────────────────────────────────────────────────────────────
-function PreviewModal({ template, onClose }: { template: Template; onClose: () => void }) {
+function PreviewModal({ template, onClose, isPro }: { template: Template; onClose: () => void; isPro: boolean }) {
   const style = ACCENT_MAP[template.thumbnailColor] || { bg: template.thumbnailColor, accent: "#FFFFFF", shape: "circle" };
   const theme = getPreviewTheme(template.thumbnailColor);
 
@@ -134,13 +136,27 @@ function PreviewModal({ template, onClose }: { template: Template; onClose: () =
 
         {/* Actions */}
         <div className="p-4 space-y-2">
-          <Button
-            className="w-full bg-primary text-primary-foreground hover:bg-primary/90 gap-2"
-            onClick={() => { onClose(); window.location.hash = `#/editor/t/${template.id}`; }}
-            data-testid={`button-use-template-${template.id}`}
-          >
-            <Sparkles size={14} /> Use This Template
-          </Button>
+          {template.isPro && !isPro ? (
+            <>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground bg-secondary rounded-lg px-3 py-2">
+                <Lock size={12} className="text-primary" />
+                Pro template — upgrade to customize this design.
+              </div>
+              <Link href="/pricing">
+                <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90 gap-2">
+                  <Crown size={14} /> Upgrade to Pro
+                </Button>
+              </Link>
+            </>
+          ) : (
+            <Button
+              className="w-full bg-primary text-primary-foreground hover:bg-primary/90 gap-2"
+              onClick={() => { onClose(); window.location.hash = `#/editor/t/${template.id}`; }}
+              data-testid={`button-use-template-${template.id}`}
+            >
+              <Sparkles size={14} /> Use This Template
+            </Button>
+          )}
           <p className="text-center text-xs text-muted-foreground">
             All elements are fully customizable in the editor
           </p>
@@ -151,7 +167,7 @@ function PreviewModal({ template, onClose }: { template: Template; onClose: () =
 }
 
 // ─── Template card ────────────────────────────────────────────────────────────
-function TemplateCard({ template, onPreview }: { template: Template; onPreview: () => void }) {
+function TemplateCard({ template, onPreview, locked }: { template: Template; onPreview: () => void; locked?: boolean }) {
   const style = ACCENT_MAP[template.thumbnailColor] || { bg: template.thumbnailColor, accent: "#FFFFFF", shape: "circle" };
   const theme = getPreviewTheme(template.thumbnailColor);
 
@@ -195,6 +211,16 @@ function TemplateCard({ template, onPreview }: { template: Template; onPreview: 
         <div className={`absolute top-2 left-2 px-1.5 py-0.5 rounded-full text-[10px] font-medium capitalize border ${theme.badge}`}>
           {template.category}
         </div>
+        {template.isPro ? (
+          <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-primary/90 text-primary-foreground flex items-center gap-0.5">
+            <Crown size={9} /> PRO
+          </div>
+        ) : null}
+        {locked ? (
+          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+            <Lock size={20} className="text-white" />
+          </div>
+        ) : null}
       </div>
 
       <div className="p-3 bg-card flex items-center justify-between">
@@ -213,6 +239,7 @@ export default function Gallery() {
   const [activeCategory, setActiveCategory] = useState("all");
   const [search, setSearch] = useState("");
   const [preview, setPreview] = useState<Template | null>(null);
+  const { isPro } = useAuth();
 
   const { data: templates = [], isLoading } = useQuery<Template[]>({
     queryKey: ["/api/templates"],
@@ -304,7 +331,14 @@ export default function Gallery() {
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {filtered.map(t => <TemplateCard key={t.id} template={t} onPreview={() => setPreview(t)} />)}
+            {filtered.map(t => (
+              <TemplateCard
+                key={t.id}
+                template={t}
+                locked={!!t.isPro && !isPro}
+                onPreview={() => setPreview(t)}
+              />
+            ))}
           </div>
         )}
 
@@ -321,7 +355,7 @@ export default function Gallery() {
       </main>
 
       {/* Preview modal */}
-      {preview && <PreviewModal template={preview} onClose={() => setPreview(null)} />}
+      {preview && <PreviewModal template={preview} isPro={isPro} onClose={() => setPreview(null)} />}
     </div>
   );
 }

@@ -19,6 +19,11 @@ export default function Navbar() {
 
   const isActive = (href: string) => location === href;
 
+  const navLinks = [
+    { href: "/templates", label: "Templates" },
+    ...(isPro ? [{ href: "/bulk", label: "Bulk Generate" }] : []),
+  ];
+
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-card">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14">
@@ -38,7 +43,7 @@ export default function Navbar() {
 
         {/* Nav links */}
         <nav className="hidden md:flex items-center gap-1">
-          {[{ href: "/templates", label: "Templates" }, { href: "/bulk", label: "Bulk Generate" }].map(({ href, label }) => (
+          {navLinks.map(({ href, label }) => (
             <Link key={href} href={href}>
               <div className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${isActive(href) ? "bg-accent/20 text-gold" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}>
                 {label}
@@ -103,11 +108,13 @@ export default function Navbar() {
                     <div className="flex items-center gap-2 w-full cursor-pointer"><FolderOpen size={14} /> My Cards</div>
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/bulk">
-                    <div className="flex items-center gap-2 w-full cursor-pointer"><Layers size={14} /> Bulk Generate</div>
-                  </Link>
-                </DropdownMenuItem>
+                {isPro && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/bulk">
+                      <div className="flex items-center gap-2 w-full cursor-pointer"><Layers size={14} /> Bulk Generate</div>
+                    </Link>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem asChild>
                   <Link href="/payments">
                     <div className="flex items-center gap-2 w-full cursor-pointer"><CreditCard size={14} /> Payments</div>

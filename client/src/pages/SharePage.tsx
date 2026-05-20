@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Download, ArrowLeft, Loader2 } from "lucide-react";
+import { useFabric } from "@/hooks/useFabric";
 
 // Shared canvas dimensions matching Editor
 let CANVAS_W = 400;
@@ -14,31 +15,24 @@ const MAX_W = 480;
 const MAX_H = 600;
 
 export default function SharePage() {
-  const { id } = useParams<{ id: string }>();
+  const { token } = useParams<{ token: string }>();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricRef = useRef<any>(null);
-  const [fabricLoaded, setFabricLoaded] = useState(false);
+  const { fabricLoaded } = useFabric();
   const [rendered, setRendered] = useState(false);
 
   const { data: card, isLoading, isError } = useQuery({
-    queryKey: ["/api/projects/share", id],
+    queryKey: ["/api/share", token],
     queryFn: async () => {
-      const res = await apiRequest("GET", `/api/projects/${id}/share`);
+      const res = await apiRequest("GET", `/api/share/${token}`);
       if (!res.ok) throw new Error("Card not found");
       return res.json();
     },
-    enabled: !!id,
+    enabled: !!token,
     retry: false,
   });
 
-  // Load Fabric.js
-  useEffect(() => {
-    if ((window as any).fabric) { setFabricLoaded(true); return; }
-    const script = document.createElement("script");
-    script.src = "https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js";
-    script.onload = () => setFabricLoaded(true);
-    document.head.appendChild(script);
-  }, []);
+  // Load Fabric.js via useFabric()
 
   // Render canvas from designJson
   useEffect(() => {

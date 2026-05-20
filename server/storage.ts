@@ -3,6 +3,7 @@ import postgres from "postgres";
 import { Pool } from "pg";
 import * as schema from "@shared/schema";
 import { eq, desc, sql } from "drizzle-orm";
+import crypto from "crypto";
 import type { User, InsertUser, Template, InsertTemplate, Project, InsertProject, Payment, InsertPayment } from "@shared/schema";
 
 let dbInstance: any;
@@ -38,7 +39,7 @@ export async function initDb() {
   console.log("[DB] Initializing Supabase PostgreSQL tables...");
   await qc`CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password TEXT NOT NULL, role TEXT DEFAULT 'user', tier TEXT DEFAULT 'free', theme TEXT DEFAULT 'dark', downloads_today INTEGER DEFAULT 0, last_download_date TEXT, reset_token TEXT, reset_token_expiry TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`;
   await qc`CREATE TABLE IF NOT EXISTS templates (id SERIAL PRIMARY KEY, title TEXT NOT NULL, category TEXT DEFAULT 'birthday', status TEXT DEFAULT 'draft', preview_image TEXT, canvas_json TEXT NOT NULL, thumbnail_color TEXT DEFAULT '#8B5CF6', is_pro BOOLEAN DEFAULT FALSE, usage_count INTEGER DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`;
-  await qc`CREATE TABLE IF NOT EXISTS projects (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, template_id INTEGER, title TEXT DEFAULT 'Untitled Card', design_json TEXT NOT NULL, export_settings TEXT DEFAULT '{}', thumbnail TEXT, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`;
+  await qc`CREATE TABLE IF NOT EXISTS projects (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, template_id INTEGER, title TEXT DEFAULT 'Untitled Card', design_json TEXT NOT NULL, export_settings TEXT DEFAULT '{}', thumbnail TEXT, share_token TEXT, share_enabled BOOLEAN DEFAULT FALSE, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`;
   await qc`CREATE TABLE IF NOT EXISTS payments (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, reference TEXT NOT NULL UNIQUE, amount INTEGER NOT NULL, currency TEXT DEFAULT 'NGN', status TEXT DEFAULT 'pending', plan TEXT DEFAULT 'pro_lifetime', paystack_data TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`;
   
   // Create connect-pg-simple session table required for auth
@@ -58,7 +59,14 @@ export async function initDb() {
   await qc`CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire")`;
 
   await qc`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`;
+  try {
+    await qc`ALTER TABLE projects ADD COLUMN IF NOT EXISTS share_token TEXT`;
+    await qc`ALTER TABLE projects ADD COLUMN IF NOT EXISTS share_enabled BOOLEAN DEFAULT FALSE`;
+  } catch {
+    // Columns may already exist on older Postgres versions without IF NOT EXISTS support.
+  }
   await qc`CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id)`;
+  await qc`CREATE INDEX IF NOT EXISTS idx_projects_share_token ON projects(share_token)`;
   await qc`CREATE INDEX IF NOT EXISTS idx_payments_user_id ON payments(user_id)`;
   console.log("[DB] ✅ Database initialized successfully");
   await qc.end(); // close this single-purpose connection pool so we don't block
@@ -142,11 +150,41 @@ export class Storage {
   async deleteTemplate(id: number): Promise<void> { await getDb().delete(schema.templates).where(eq(schema.templates.id, id)); }
   async incrementTemplateUsage(id: number): Promise<void> { await getDb().update(schema.templates).set({ usageCount: sql`usage_count + 1` }).where(eq(schema.templates.id, id)); }
   async getProject(id: number): Promise<Project | undefined> { const [p] = await getDb().select().from(schema.projects).where(eq(schema.projects.id, id)).limit(1); return p; }
+  async getProjectByShareToken(token: string): Promise<Project | undefined> {
+    const [p] = await getDb().select().from(schema.projects).where(eq(schema.projects.shareToken, token)).limit(1);
+    return p;
+  }
   async getProjectsByUser(userId: number): Promise<Project[]> { return getDb().select().from(schema.projects).where(eq(schema.projects.userId, userId)).orderBy(desc(schema.projects.updatedAt)); }
-  async createProject(data: InsertProject): Promise<Project> { const [p] = await getDb().insert(schema.projects).values(data).returning(); return p; }
+  async createProject(data: InsertProject): Promise<Project> {
+    const shareToken = crypto.randomBytes(24).toString("hex");
+    const [p] = await getDb().insert(schema.projects).values({ ...data, shareToken }).returning();
+    return p;
+  }
   async updateProject(id: number, data: Partial<InsertProject>): Promise<Project | undefined> { const [p] = await getDb().update(schema.projects).set(data).where(eq(schema.projects.id, id)).returning(); return p; }
   async deleteProject(id: number): Promise<void> { await getDb().delete(schema.projects).where(eq(schema.projects.id, id)); }
-  async duplicateProject(id: number, userId: number): Promise<Project | undefined> { const existing = await this.getProject(id); if (!existing) return undefined; const [d] = await getDb().insert(schema.projects).values({ userId, templateId: existing.templateId, title: `${existing.title} (Copy)`, designJson: existing.designJson, exportSettings: existing.exportSettings, thumbnail: existing.thumbnail }).returning(); return d; }
+  async duplicateProject(id: number, userId: number): Promise<Project | undefined> {
+    const existing = await this.getProject(id);
+    if (!existing || existing.userId !== userId) return undefined;
+    const shareToken = crypto.randomBytes(24).toString("hex");
+    const [d] = await getDb().insert(schema.projects).values({
+      userId,
+      templateId: existing.templateId,
+      title: `${existing.title} (Copy)`,
+      designJson: existing.designJson,
+      exportSettings: existing.exportSettings,
+      thumbnail: existing.thumbnail,
+      shareToken,
+      shareEnabled: false,
+    }).returning();
+    return d;
+  }
+  async enableProjectShare(id: number, userId: number): Promise<Project | undefined> {
+    const existing = await this.getProject(id);
+    if (!existing || existing.userId !== userId) return undefined;
+    const shareToken = existing.shareToken || crypto.randomBytes(24).toString("hex");
+    const [p] = await getDb().update(schema.projects).set({ shareEnabled: true, shareToken }).where(eq(schema.projects.id, id)).returning();
+    return p;
+  }
   async renameProject(id: number, userId: number, title: string): Promise<Project | undefined> { const existing = await this.getProject(id); if (!existing || existing.userId !== userId) return undefined; const [p] = await getDb().update(schema.projects).set({ title }).where(eq(schema.projects.id, id)).returning(); return p; }
   async getPayment(reference: string): Promise<Payment | undefined> { const [p] = await getDb().select().from(schema.payments).where(eq(schema.payments.reference, reference)).limit(1); return p; }
   async getPaymentsByUser(userId: number): Promise<Payment[]> { return getDb().select().from(schema.payments).where(eq(schema.payments.userId, userId)).orderBy(desc(schema.payments.createdAt)); }

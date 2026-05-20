@@ -193,7 +193,7 @@ export default function Landing() {
           <h2 className="text-2xl font-bold mb-2 font-display">
             Ready to create your first card?
           </h2>
-          <p className="text-muted-foreground mb-6 text-sm">No sign-up. No watermarks. Just design and download.</p>
+          <p className="text-muted-foreground mb-6 text-sm">Start designing free — sign in to save cards and remove watermarks with Pro.</p>
           <Link href="/templates">
             <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2 px-10">
               <Sparkles size={16} /> Browse Templates

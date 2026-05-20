@@ -11,7 +11,9 @@ import crypto from "crypto";
 import Database from "better-sqlite3";
 import rateLimit from "express-rate-limit";
 import validator from "validator";
-import { FREE_DOWNLOAD_LIMIT, PRO_PRICE_KOBO, PRO_PRICE_NGN } from "@shared/schema";
+import { FREE_DOWNLOAD_LIMIT, FREE_PROJECT_LIMIT, PRO_PRICE_KOBO, PRO_PRICE_NGN } from "@shared/schema";
+import { getPaystackPublic, getPaystackSecret, getSessionSecret } from "./env";
+import { buildPricingQuote } from "./pricing";
 
 declare module "express-session" {
   interface SessionData {
@@ -19,14 +21,15 @@ declare module "express-session" {
     userRole?: string;
     userTier?: string;
     mustChangePassword?: boolean;
+    guestDownloadsToday?: number;
+    guestDownloadDate?: string;
   }
 }
 
 const isProd = process.env.NODE_ENV === "production";
 
-// ─── Environment ──────────────────────────────────────────────────────────────
-const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY || "sk_test_placeholder";
-const PAYSTACK_PUBLIC = process.env.PAYSTACK_PUBLIC_KEY || "pk_test_placeholder";
+const PAYSTACK_SECRET = getPaystackSecret();
+const PAYSTACK_PUBLIC = getPaystackPublic();
 
 // ─── Sanitise helpers ─────────────────────────────────────────────────────────
 /** Strip all HTML tags — prevents XSS in email bodies */
@@ -164,8 +167,8 @@ function paystackRequest(method: string, path: string, body?: object): Promise<a
 
 // ─── Rate limiters ────────────────────────────────────────────────────────────
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,   // 15 minutes
-  max: 10,                      // max 10 attempts per IP per window
+  windowMs: 15 * 60 * 1000,
+  max: process.env.NODE_ENV === "production" ? 10 : 200,
   message: { error: "Too many attempts. Please try again in 15 minutes." },
   standardHeaders: true,
   legacyHeaders: false,
@@ -186,8 +189,6 @@ const emailSendLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
-
-const FREE_PROJECT_LIMIT = 20;
 
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,         // 1 minute
@@ -225,7 +226,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         pool: getPgPool(),
         tableName: "session",
       }),
-      secret: process.env.SESSION_SECRET || "cardcraft-fallback-secret-change-in-prod",
+      secret: getSessionSecret(),
       resave: false,
       saveUninitialized: false,
       cookie: {
@@ -437,20 +438,54 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // ─── Downloads ──────────────────────────────────────────────────────────────
+  const trackGuestDownload = (req: any) => {
+    const today = new Date().toISOString().split("T")[0];
+    const lastDate = req.session.guestDownloadDate;
+    const downloadsToday = lastDate === today ? (req.session.guestDownloadsToday || 0) + 1 : 1;
+    const allowed = downloadsToday <= FREE_DOWNLOAD_LIMIT;
+    if (allowed) {
+      req.session.guestDownloadsToday = downloadsToday;
+      req.session.guestDownloadDate = today;
+    }
+    return { allowed, downloadsToday };
+  };
+
   app.post("/api/downloads/track", async (req, res) => {
-    if (!req.session.userId) return res.json({ allowed: true, tier: "guest", downloadsToday: 0, limit: FREE_DOWNLOAD_LIMIT });
+    if (!req.session.userId) {
+      const result = trackGuestDownload(req);
+      return res.json({ allowed: result.allowed, tier: "guest", downloadsToday: result.downloadsToday, limit: FREE_DOWNLOAD_LIMIT });
+    }
     const result = await storage.trackDownload(req.session.userId);
     const user = await storage.getUser(req.session.userId);
     res.json({ allowed: result.allowed, tier: user?.tier || "free", downloadsToday: result.downloadsToday, limit: FREE_DOWNLOAD_LIMIT });
   });
 
   app.get("/api/downloads/status", async (req, res) => {
-    if (!req.session.userId) return res.json({ tier: "guest", downloadsToday: 0, limit: FREE_DOWNLOAD_LIMIT, allowed: true });
+    if (!req.session.userId) {
+      const today = new Date().toISOString().split("T")[0];
+      const downloadsToday = req.session.guestDownloadDate === today ? (req.session.guestDownloadsToday || 0) : 0;
+      return res.json({
+        tier: "guest",
+        downloadsToday,
+        limit: FREE_DOWNLOAD_LIMIT,
+        allowed: downloadsToday < FREE_DOWNLOAD_LIMIT,
+      });
+    }
     const user = await storage.getUser(req.session.userId);
     if (!user) return res.json({ tier: "guest", downloadsToday: 0, limit: FREE_DOWNLOAD_LIMIT, allowed: true });
     const today = new Date().toISOString().split("T")[0];
     const downloadsToday = user.lastDownloadDate === today ? (user.downloadsToday || 0) : 0;
     res.json({ tier: user.tier, downloadsToday, limit: FREE_DOWNLOAD_LIMIT, allowed: user.tier === "pro" || downloadsToday < FREE_DOWNLOAD_LIMIT });
+  });
+
+  app.get("/api/pricing/quote", async (req, res) => {
+    try {
+      const quote = await buildPricingQuote(req);
+      res.json(quote);
+    } catch (err) {
+      console.error("[pricing] quote error:", err);
+      res.status(500).json({ error: "Could not load pricing quote" });
+    }
   });
 
   // ─── Templates ──────────────────────────────────────────────────────────────
@@ -467,6 +502,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (!id) return res.status(400).json({ error: "Invalid ID" });
     const t = await storage.getTemplate(id);
     if (!t) return res.status(404).json({ error: "Not found" });
+    const isProUser = req.session.userTier === "pro" || req.session.userRole === "admin";
+    if (t.isPro && !isProUser) {
+      return res.status(403).json({ error: "This template requires a Pro account.", code: "PRO_TEMPLATE" });
+    }
     if (req.session.userId) await storage.incrementTemplateUsage(id);
     res.json(t);
   });
@@ -555,8 +594,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const id = safeId(req.params.id);
     if (!id) return res.status(400).json({ error: "Invalid ID" });
     const copy = await storage.duplicateProject(id, req.session.userId!);
-    if (!copy) return res.status(404).json({ error: "Not found or unauthorized" });
+    if (!copy) return res.status(404).json({ error: "Not found" });
     res.status(201).json(copy);
+  });
+
+  app.post("/api/projects/:id/enable-share", requireAuth, async (req, res) => {
+    const id = safeId(req.params.id);
+    if (!id) return res.status(400).json({ error: "Invalid ID" });
+    const project = await storage.enableProjectShare(id, req.session.userId!);
+    if (!project) return res.status(404).json({ error: "Not found" });
+    res.json({ shareToken: project.shareToken, shareEnabled: project.shareEnabled });
   });
 
   app.patch("/api/projects/:id/rename", requireAuth, async (req, res) => {
@@ -569,13 +616,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(p);
   });
 
-  // ─── Public project share (no auth required) ──────────────────────────────────
-  app.get("/api/projects/:id/share", async (req, res) => {
-    const id = safeId(req.params.id);
-    if (!id) return res.status(400).json({ error: "Invalid ID" });
-    const p = await storage.getProject(id);
-    if (!p) return res.status(404).json({ error: "Not found" });
-    // Return only safe fields — no userId exposed
+  // ─── Public project share (token-based) ─────────────────────────────────────
+  app.get("/api/share/:token", async (req, res) => {
+    const token = String(req.params.token || "").trim();
+    if (!token || token.length < 16) return res.status(400).json({ error: "Invalid share token" });
+    const p = await storage.getProjectByShareToken(token);
+    if (!p || !p.shareEnabled) return res.status(404).json({ error: "Not found" });
     res.json({
       id: p.id,
       title: p.title,
@@ -583,6 +629,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       thumbnail: p.thumbnail,
       updatedAt: p.updatedAt,
     });
+  });
+
+  // Legacy id-based share — disabled; use token URLs instead
+  app.get("/api/projects/:id/share", async (req, res) => {
+    return res.status(410).json({ error: "Share links now use secure tokens. Enable sharing from the editor." });
   });
 
   // ─── Paystack ────────────────────────────────────────────────────────────────
@@ -633,8 +684,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // Raw body required for HMAC verification — must be registered BEFORE express.json parses it
   app.post("/api/payments/webhook", async (req, res) => {
     const secret = process.env.PAYSTACK_SECRET_KEY;
-    if (secret) {
-      // Use raw body buffer for HMAC (express.json has already parsed but rawBody was saved)
+    if (!secret) {
+      if (isProd) return res.status(503).json({ error: "Webhook verification not configured" });
+    } else {
       const rawBody = (req as any).rawBody;
       if (!rawBody) return res.status(400).send("No raw body");
       const hash = crypto.createHmac("sha512", secret).update(rawBody).digest("hex");
@@ -661,7 +713,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // ─── Email ───────────────────────────────────────────────────────────────────
-  app.post("/api/email/send-card", emailSendLimiter, async (req, res) => {
+  app.post("/api/email/send-card", emailSendLimiter, requireAuth, async (req, res) => {
     const { to, subject, message, imageDataUrl, cardTitle } = req.body;
 
     // Validate recipient

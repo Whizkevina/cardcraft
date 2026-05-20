@@ -23,22 +23,23 @@
 - **Send by email** — delivers the card as an embedded image to any email address
 - **Watermark** on free user exports (removed for Pro accounts)
 
-### Bulk Generation
+### Bulk Generation (Pro)
 - Upload a **CSV file** with `name, greeting, date, subtitle` columns
 - CardCraft auto-generates a personalized card for every row
 - Download individually or all at once
+- **Requires a Pro account**
 
 ### Accounts & Tiers
 | Feature | Free | Pro |
 |---|---|---|
-| All templates | ✅ | ✅ |
+| All free templates | ✅ | ✅ (+ Pro templates) |
 | Downloads per day | 3 | Unlimited |
 | Watermark on export | Yes | No |
-| Save cards | ✅ | ✅ |
-| Bulk generator | ✅ | ✅ |
-| Email delivery | ✅ | ✅ |
+| Save cards | Up to 5 | Unlimited |
+| Bulk generator | — | ✅ |
+| Email delivery | ✅ (sign in required) | ✅ |
 
-**Pro is a one-time payment of ₦10,000 (lifetime access)** via Paystack.
+**Pro is a one-time payment of ₦10,000 (lifetime access)** via Paystack. The pricing page auto-detects your region and shows an approximate local currency; checkout always charges NGN.
 
 ### Admin Panel
 - View all registered users
@@ -54,13 +55,13 @@
 | Layer | Technology |
 |---|---|
 | Frontend | React 18 + TypeScript + Vite |
-| Canvas Editor | Fabric.js 5 |
+| Canvas Editor | Fabric.js 5 (CDN, loaded via `client/src/lib/loadFabric.ts`) |
 | UI Components | Tailwind CSS v3 + shadcn/ui |
 | Routing | Wouter (hash-based for iframe compatibility) |
 | State & Data | TanStack Query v5 |
 | Backend | Express.js (Node.js) |
-| Database | SQLite via Drizzle ORM + better-sqlite3 |
-| Authentication | express-session + bcryptjs |
+| Database | PostgreSQL via Drizzle ORM |
+| Authentication | express-session + connect-pg-simple + bcryptjs |
 | Payment | Paystack (inline popup + webhook) |
 | Email | Nodemailer + Gmail SMTP |
 | QR Codes | qrcode (browser-side generation) |
@@ -72,6 +73,7 @@
 ### Prerequisites
 - Node.js 18+
 - npm 9+
+- PostgreSQL 14+ (local, Supabase, or Railway Postgres)
 
 ### Installation
 
@@ -79,6 +81,8 @@
 git clone https://github.com/YOUR_USERNAME/cardcraft.git
 cd cardcraft
 npm install
+cp .env.example .env.local
+# Edit .env.local — set DATABASE_URL at minimum
 ```
 
 ### Development
@@ -100,24 +104,27 @@ NODE_ENV=production node dist/index.cjs
 
 ## ⚙️ Environment Variables
 
-Create a `.env` file in the project root or set these on your hosting platform:
+Copy [`.env.example`](.env.example) to `.env.local` for local development. The server loads `.env.local` first, then `.env`.
 
 ```env
-# Paystack — get keys from https://dashboard.paystack.com/#/settings/developers
+# Required
+DATABASE_URL=postgresql://user:password@localhost:5432/cardcraft
+
+# Required in production
+SESSION_SECRET=change-this-to-a-secure-random-string
+APP_URL=https://your-domain.com
 PAYSTACK_SECRET_KEY=sk_live_xxxxxxxxxxxxxxxxxxxx
 PAYSTACK_PUBLIC_KEY=pk_live_xxxxxxxxxxxxxxxxxxxx
 
-# Gmail SMTP — use an App Password, not your Gmail password
-# Enable at: Google Account → Security → 2-Step Verification → App Passwords
+# Optional — Google Sign-In
+VITE_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+
+# Optional — email (simulated without these)
 GMAIL_USER=your@gmail.com
 GMAIL_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
-
-# App URL — used for Paystack callback redirect
-APP_URL=https://your-domain.com
-
-# Session secret — change this to a random string in production
-SESSION_SECRET=change-this-to-a-secure-random-string
 ```
+
+E2E tests use `.env.test` (see [`.env.test.example`](.env.test.example)).
 
 > **Gmail App Password**: Go to [myaccount.google.com](https://myaccount.google.com) → Security → 2-Step Verification → App Passwords → Create one for "Mail".
 
@@ -127,7 +134,7 @@ SESSION_SECRET=change-this-to-a-secure-random-string
 
 ### Option 1 — Railway (Recommended ⭐)
 
-Railway supports Node.js + SQLite with zero configuration — `railway.toml` is already included in this repo.
+Railway supports Node.js + PostgreSQL — add a Postgres plugin and set `DATABASE_URL`.
 
 [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template/new?referralCode=cardcraft)
 
@@ -135,23 +142,25 @@ Railway supports Node.js + SQLite with zero configuration — `railway.toml` is 
 
 1. Go to [railway.app](https://railway.app) and sign up / log in
 2. Click **New Project → Deploy from GitHub repo**
-3. Select **Whizkevina/cardcraft** (or your fork)
-4. Railway reads `railway.toml` automatically — no manual config needed
+3. Add a **PostgreSQL** database to the project
+4. Select your CardCraft service repo
 5. Go to your service → **Variables** tab and add:
 
 | Variable | Value |
 |---|---|
+| `DATABASE_URL` | From Railway Postgres plugin (auto-linked) |
 | `PAYSTACK_SECRET_KEY` | `sk_live_xxxx` from Paystack dashboard |
 | `PAYSTACK_PUBLIC_KEY` | `pk_live_xxxx` from Paystack dashboard |
 | `GMAIL_USER` | Your Gmail address |
 | `GMAIL_APP_PASSWORD` | Gmail App Password (16-char code) |
 | `SESSION_SECRET` | Any long random string |
 | `APP_URL` | Your Railway URL e.g. `https://cardcraft.railway.app` |
+| `NODE_ENV` | `production` |
 
 6. Click **Deploy** — Railway builds and starts the app in ~2 minutes
 7. Your app is live at `https://cardcraft-production-xxxx.up.railway.app`
 
-**Persistent storage note:** The SQLite database (`cardcraft.db`) is stored on the Railway volume. To add a persistent volume: service → **Add Volume** → mount path `/app` (or wherever your app runs).
+**Database note:** Use Railway's **PostgreSQL** plugin and link `DATABASE_URL` to your service. Tables are created automatically on first startup.
 
 > Free tier includes $5/month credit — enough for a low-traffic app.
 
@@ -192,7 +201,7 @@ pm2 startup
 
 ### ⚠️ Why not GitHub Pages?
 
-GitHub Pages only hosts **static files** — it cannot run a Node.js/Express backend, SQLite database, or server-side APIs. CardCraft requires a server for:
+GitHub Pages only hosts **static files** — it cannot run the Node.js/Express backend, PostgreSQL database, or server-side APIs. CardCraft requires a server for:
 - User authentication and sessions
 - Saving/loading projects
 - Paystack payment verification
@@ -204,12 +213,14 @@ GitHub Pages only hosts **static files** — it cannot run a Node.js/Express bac
 
 ## 🔑 First-Time Setup (after deploy)
 
-1. Open your deployed app
-2. Go to `/admin` (or click Admin in nav)
-3. Click **"Create Admin Account"** — this seeds `admin@cardcraft.com` / `admin123`
-4. Sign in with those credentials
-5. **Immediately change the password** (edit in DB or add a change-password endpoint)
-6. From the Admin panel → Users tab, you can upgrade any user to Pro
+**Production:** Create an admin user directly in the database (the in-app seed button only works on local dev).
+
+**Local development:**
+
+1. Run the app with `npm run dev`
+2. Go to `/admin` and click **"Create Admin Account"** — seeds `admin@cardcraft.com` / `admin123`
+3. Sign in and **immediately change the password** from Account Settings
+4. From the Admin panel → Users tab, you can upgrade any user to Pro
 
 ---
 
@@ -243,7 +254,6 @@ cardcraft/
 ├── shared/
 │   └── schema.ts           # Drizzle ORM schema + shared types
 ├── dist/                   # Production build output (git-ignored)
-├── cardcraft.db            # SQLite database (git-ignored)
 └── package.json
 ```
 
@@ -257,12 +267,16 @@ cardcraft/
 | POST | `/api/auth/login` | Sign in |
 | GET | `/api/auth/me` | Get current user |
 | GET | `/api/templates` | List published templates |
+| GET | `/api/templates/:id` | Get template (403 if Pro-only and user is free) |
 | GET | `/api/projects` | List user's saved cards |
 | POST | `/api/projects` | Save a card |
+| POST | `/api/projects/:id/enable-share` | Enable public share link (auth required) |
+| GET | `/api/share/:token` | Public shared card view |
+| GET | `/api/pricing/quote` | Localized Pro price display (auto-detect country; charge remains NGN) |
 | POST | `/api/payments/initialize` | Start Paystack payment |
 | POST | `/api/payments/confirm` | Verify payment after popup closes |
 | POST | `/api/payments/webhook` | Paystack server-to-server webhook |
-| POST | `/api/email/send-card` | Send card to email |
+| POST | `/api/email/send-card` | Send card to email (auth required) |
 | GET | `/api/admin/users` | List all users (admin only) |
 | PATCH | `/api/admin/users/:id/tier` | Toggle Free/Pro (admin only) |
 

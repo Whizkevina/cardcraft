@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "./AuthProvider";
 import { apiRequest } from "@/lib/queryClient";
+import { applySvgTextMode, type SvgTextMode } from "@/lib/svgTextExport";
 import { Download, Share2, Copy, Link, Sparkles, Lock, QrCode, Mail, Loader2 } from "lucide-react";
 
 const EXPORT_PRESETS = [
@@ -24,11 +25,13 @@ interface SharePanelProps {
   projectTitle: string;
   projectId?: number | null;
   onQROpen: () => void;
+  svgTextMode: SvgTextMode;
+  onSvgTextModeChange: (mode: SvgTextMode) => void;
 }
 
 const FREE_LIMIT = 3;
 
-export function SharePanel({ fabricRef, projectTitle, projectId, onQROpen }: SharePanelProps) {
+export function SharePanel({ fabricRef, projectTitle, projectId, onQROpen, svgTextMode, onSvgTextModeChange }: SharePanelProps) {
   const { user, isPro } = useAuth();
   const { toast } = useToast();
   const [preset, setPreset] = useState(EXPORT_PRESETS[0]);
@@ -49,7 +52,12 @@ export function SharePanel({ fabricRef, projectTitle, projectId, onQROpen }: Sha
       }
       return true;
     } catch {
-      return true; // Fail open — don't block on network error
+      toast({
+        title: "Could not verify download limit",
+        description: "Check your connection and try again.",
+        variant: "destructive",
+      });
+      return false;
     }
   };
 
@@ -91,6 +99,35 @@ export function SharePanel({ fabricRef, projectTitle, projectId, onQROpen }: Sha
     return dataURL;
   };
 
+  const getExportSVG = async (): Promise<string | null> => {
+    const canvas = fabricRef.current;
+    if (!canvas) return null;
+    const f = (window as any).fabric;
+    const currentZoom = canvas.getZoom();
+    canvas.setZoom(1);
+    const wm = applyWatermark(canvas, f);
+    try {
+      const width = Math.round(canvas.width * preset.multiplier);
+      const height = Math.round(canvas.height * preset.multiplier);
+      let svg = canvas.toSVG({ suppressPreamble: false });
+      svg = svg.replace(/<svg([^>]*)>/, (_match: string, attrs: string) => {
+        const cleaned = attrs
+          .replace(/\swidth="[^"]*"/g, "")
+          .replace(/\sheight="[^"]*"/g, "")
+          .replace(/\sviewBox="[^"]*"/g, "");
+        return `<svg${cleaned} width="${width}" height="${height}" viewBox="0 0 ${canvas.width} ${canvas.height}">`;
+      });
+      svg = await applySvgTextMode(svg, svgTextMode);
+      return svg;
+    } catch (err) {
+      console.error("[SharePanel] SVG export failed:", err);
+      return null;
+    } finally {
+      removeWatermark(canvas, wm);
+      canvas.setZoom(currentZoom);
+    }
+  };
+
   // Download as file
   const downloadCard = async (format: "png" | "jpeg") => {
     const allowed = await checkAndTrack();
@@ -108,6 +145,24 @@ export function SharePanel({ fabricRef, projectTitle, projectId, onQROpen }: Sha
 
     const remaining = user && !isPro ? `${FREE_LIMIT - ((user.downloadsToday || 0) + 1)} free downloads remaining today` : "";
     toast({ title: "Downloaded!", description: remaining || `${format.toUpperCase()} exported.` });
+  };
+
+  const downloadSvg = async () => {
+    const allowed = await checkAndTrack();
+    if (!allowed) return;
+
+    const svg = await getExportSVG();
+    if (!svg) return;
+
+    const a = document.createElement("a");
+    a.href = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    a.download = `${projectTitle.replace(/\s+/g, "-")}.svg`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    const remaining = user && !isPro ? `${FREE_LIMIT - ((user.downloadsToday || 0) + 1)} free downloads remaining today` : "";
+    toast({ title: "Downloaded!", description: remaining || "SVG exported." });
   };
 
   // Copy image to clipboard
@@ -174,15 +229,26 @@ export function SharePanel({ fabricRef, projectTitle, projectId, onQROpen }: Sha
     }
   };
 
-  // Copy shareable link — public /share/:id if saved, else editor URL
+  // Copy shareable link — public /share/:token if saved, else editor URL
   const copyLink = async () => {
     const base = window.location.origin + window.location.pathname.replace(/index\.html$/, "");
-    const url = projectId
-      ? `${base}#/share/${projectId}`
-      : window.location.href;
+    if (projectId) {
+      try {
+        const res = await apiRequest("POST", `/api/projects/${projectId}/enable-share`);
+        const data = await res.json();
+        const url = `${base}#/share/${data.shareToken}`;
+        await navigator.clipboard.writeText(url);
+        toast({ title: "Link copied!", description: "Anyone with this link can view the card." });
+        return;
+      } catch {
+        toast({ title: "Copy failed", variant: "destructive" });
+        return;
+      }
+    }
+    const url = window.location.href;
     try {
       await navigator.clipboard.writeText(url);
-      toast({ title: "Link copied!", description: projectId ? "Anyone can view this card via the link." : "Share this link to open the card in the editor." });
+      toast({ title: "Link copied!", description: "Share this link to open the card in the editor." });
     } catch {
       toast({ title: "Copy failed", variant: "destructive" });
     }
@@ -233,6 +299,29 @@ export function SharePanel({ fabricRef, projectTitle, projectId, onQROpen }: Sha
         </Select>
       </div>
 
+      <div className="space-y-1.5">
+        <Label className="text-xs text-muted-foreground">SVG Text</Label>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => onSvgTextModeChange("embed")}
+            className={`text-xs px-2 py-2 rounded border ${svgTextMode === "embed" ? "bg-primary text-primary-foreground border-primary" : "bg-secondary border-border text-muted-foreground hover:text-foreground"}`}
+            data-testid="button-svg-embed"
+          >
+            Embed Fonts
+          </button>
+          <button
+            type="button"
+            onClick={() => onSvgTextModeChange("paths")}
+            className={`text-xs px-2 py-2 rounded border ${svgTextMode === "paths" ? "bg-primary text-primary-foreground border-primary" : "bg-secondary border-border text-muted-foreground hover:text-foreground"}`}
+            data-testid="button-svg-paths"
+          >
+            Convert to Paths
+          </button>
+        </div>
+        <p className="text-[10px] text-muted-foreground">Used for SVG exports in the top bar and here. Fonts without web files stay as text.</p>
+      </div>
+
       {/* Download buttons */}
       <div className="space-y-2">
         <Button
@@ -247,6 +336,13 @@ export function SharePanel({ fabricRef, projectTitle, projectId, onQROpen }: Sha
           onClick={() => downloadCard("jpeg")} data-testid="button-download-jpg"
         >
           <Download size={13} /> Download JPG
+          {!isPro && <span className="ml-auto text-muted-foreground text-[10px]">+watermark</span>}
+        </Button>
+        <Button
+          variant="outline" className="w-full gap-2 h-9 text-xs"
+          onClick={downloadSvg} data-testid="button-download-svg"
+        >
+          <Download size={13} /> Download SVG
           {!isPro && <span className="ml-auto text-muted-foreground text-[10px]">+watermark</span>}
         </Button>
       </div>
@@ -347,6 +443,7 @@ function EmailSendSection({ fabricRef, projectTitle, isPro }: { fabricRef: any; 
 
       const res = await fetch("/api/email/send-card", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ to: email, message, imageDataUrl: dataURL, cardTitle: projectTitle }),
       });

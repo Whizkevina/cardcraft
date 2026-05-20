@@ -1,6 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-// In both development and production, use relative URLs (same domain)
 const API_BASE = "";
 
 async function throwIfResNotOk(res: Response) {
@@ -16,22 +15,16 @@ export async function apiRequest(
   data?: unknown | undefined,
 ): Promise<Response> {
   const fullUrl = `${API_BASE}${url}`;
-  console.log(`[apiRequest] ${method} ${fullUrl}`, data ? `with data: ${JSON.stringify(data).slice(0, 50)}...` : "");
-  
-  try {
-    const res = await fetch(fullUrl, {
-      method,
-      headers: data ? { "Content-Type": "application/json" } : {},
-      body: data ? JSON.stringify(data) : undefined,
-    });
 
-    console.log(`[apiRequest] Response status: ${res.status} ${res.statusText}`);
-    await throwIfResNotOk(res);
-    return res;
-  } catch (err) {
-    console.error(`[apiRequest] Error on ${method} ${fullUrl}:`, err);
-    throw err;
-  }
+  const res = await fetch(fullUrl, {
+    method,
+    credentials: "include",
+    headers: data ? { "Content-Type": "application/json" } : {},
+    body: data ? JSON.stringify(data) : undefined,
+  });
+
+  await throwIfResNotOk(res);
+  return res;
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
@@ -40,7 +33,9 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(`${API_BASE}${queryKey.join("/")}`);
+    const res = await fetch(`${API_BASE}${queryKey.join("/")}`, {
+      credentials: "include",
+    });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
       return null;
@@ -56,7 +51,7 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
+      staleTime: 30_000,
       retry: false,
     },
     mutations: {

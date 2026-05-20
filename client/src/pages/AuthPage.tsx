@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Sparkles, Eye, EyeOff } from "lucide-react";
 import { GoogleLogin } from "@react-oauth/google";
+import { isGoogleAuthConfigured } from "@/lib/googleAuth";
 
 export default function AuthPage() {
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -110,38 +111,42 @@ export default function AuthPage() {
             </Button>
           </form>
 
-          <div className="relative mt-8 mb-6">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-border" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-3 text-muted-foreground font-medium">Or continue with</span>
-            </div>
-          </div>
+          {isGoogleAuthConfigured && (
+            <>
+              <div className="relative mt-8 mb-6">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-border" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-3 text-muted-foreground font-medium">Or continue with</span>
+                </div>
+              </div>
 
-          <div className="flex justify-center">
-            <GoogleLogin
-              onSuccess={async (credentialResponse) => {
-                setLoading(true);
-                try {
-                  await login(undefined, undefined, credentialResponse.credential);
-                  toast({ title: "Welcome back!" });
-                  setLocation("/projects");
-                } catch (err: any) {
-                  toast({ title: "Login failed", description: err.message, variant: "destructive" });
-                } finally {
-                  setLoading(false);
-                }
-              }}
-              onError={() => {
-                toast({ title: "Google login failed", variant: "destructive" });
-              }}
-              theme={document.documentElement.classList.contains("dark") ? "filled_black" : "outline"}
-              size="large"
-              shape="pill"
-              width="320"
-            />
-          </div>
+              <div className="flex justify-center">
+                <GoogleLogin
+                  onSuccess={async (credentialResponse) => {
+                    setLoading(true);
+                    try {
+                      await login(undefined, undefined, credentialResponse.credential);
+                      toast({ title: "Welcome back!" });
+                      setLocation("/projects");
+                    } catch (err: any) {
+                      toast({ title: "Login failed", description: err.message, variant: "destructive" });
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  onError={() => {
+                    toast({ title: "Google login failed", variant: "destructive" });
+                  }}
+                  theme={document.documentElement.classList.contains("dark") ? "filled_black" : "outline"}
+                  size="large"
+                  shape="pill"
+                  width="320"
+                />
+              </div>
+            </>
+          )}
 
           <p className="text-center text-sm text-muted-foreground mt-8">
             {mode === "login" ? "Don't have an account? " : "Already have an account? "}
@@ -177,8 +182,8 @@ export default function AuthPage() {
               </svg>
             </div>
           </div>
-          <p className="text-yellow-400 text-sm font-medium mb-1">Save unlimited cards</p>
-          <p className="text-white/60 text-xs max-w-xs">Registered users can save drafts, reopen designs, and manage all their birthday cards.</p>
+          <p className="text-yellow-400 text-sm font-medium mb-1">Save up to 5 cards free</p>
+          <p className="text-white/60 text-xs max-w-xs">Registered users can save drafts, reopen designs, and upgrade to Pro for unlimited storage and bulk generation.</p>
         </div>
       </div>
     </div>

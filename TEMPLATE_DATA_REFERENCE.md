@@ -258,7 +258,7 @@ Content-Type: application/json
 ## 9. MIGRATION PATH (SQLite → PostgreSQL)
 
 ### Status:
-- **Current Setup**: PostgreSQL via Supabase (see `server/db.ts` and `server/storage.ts`)
+- **Current Setup**: PostgreSQL via Drizzle (see `server/storage.ts`)
 - **Old SQLite File**: Still exists at `./cardcraft.db` - can be used as data source
 
 ### To Restore Templates to PostgreSQL:

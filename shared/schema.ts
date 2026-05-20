@@ -49,6 +49,8 @@ export const projects = pgTable("projects", {
   designJson: text("design_json").notNull(),
   exportSettings: text("export_settings").notNull().default("{}"),
   thumbnail: text("thumbnail"),
+  shareToken: text("share_token"),
+  shareEnabled: boolean("share_enabled").notNull().default(false),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -76,5 +78,6 @@ export type Payment = typeof payments.$inferSelect;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 export const FREE_DOWNLOAD_LIMIT = 3;
+export const FREE_PROJECT_LIMIT = 5;
 export const PRO_PRICE_KOBO = 1000000;
 export const PRO_PRICE_NGN  = 10000;

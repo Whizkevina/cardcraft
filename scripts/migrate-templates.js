@@ -27,7 +27,7 @@ async function migrate() {
       try {
         await sql`
           INSERT INTO templates (title, category, status, canvas_json, thumbnail_color, is_pro)
-          VALUES (${t.title}, ${t.category}, ${t.status}, ${t.canvas_json}, ${t.thumbnail_color}, ${Boolean(t.is_pro)})
+          VALUES (${t.title}, ${t.category}, ${t.status}, ${t.canvas_json}, ${t.thumbnail_color}, ${Number(t.is_pro ? 1 : 0)})
         `;
         inserted++;
       } catch (e) {

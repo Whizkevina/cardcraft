@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 import path from "path";
 
 dotenv.config({ path: path.resolve(".env.local") });
+dotenv.config({ path: path.resolve(".env") });
 
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
@@ -9,6 +10,10 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import helmet from "helmet";
 import cors from "cors";
+import { validateProductionEnv, warnDevPlaceholders } from "./env";
+
+validateProductionEnv();
+warnDevPlaceholders();
 
 const app = express();
 const httpServer = createServer(app);
@@ -51,8 +56,6 @@ app.use(
         formAction: ["'self'"],
       },
     },
-    // Allow cross-origin for iframe-embedded previews on Perplexity
-    crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
     // Allow cross-origin for iframe-embedded previews on Perplexity
     crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
     crossOriginEmbedderPolicy: false,
