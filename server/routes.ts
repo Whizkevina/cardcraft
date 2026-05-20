@@ -8,7 +8,6 @@ import PgSimpleStore from "connect-pg-simple";
 import nodemailer from "nodemailer";
 import https from "https";
 import crypto from "crypto";
-import Database from "better-sqlite3";
 import rateLimit from "express-rate-limit";
 import validator from "validator";
 import { FREE_DOWNLOAD_LIMIT, FREE_PROJECT_LIMIT, PRO_PRICE_KOBO, PRO_PRICE_NGN } from "@shared/schema";
@@ -851,6 +850,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (existingTemplates === 0) {
         try {
           logs.push("Starting SQLite import...");
+          const { default: Database } = await import("better-sqlite3");
           const sqliteDb = new Database("./cardcraft.db");
           const sqliteTemplates = sqliteDb.prepare("SELECT * FROM templates").all() as any[];
           logs.push(`Found ${sqliteTemplates.length} in SQLite`);

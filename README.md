@@ -175,6 +175,8 @@ Railway supports Node.js + PostgreSQL — add a Postgres plugin and set `DATABAS
 5. Set environment variables under Environment tab
 6. Free tier available (spins down after inactivity)
 
+> **Node version:** The repo includes `.node-version` (Node 22 LTS). Render should pick this automatically — avoid Node 26, which breaks native dev tools used at build time.
+
 ---
 
 ### Option 3 — VPS / DigitalOcean / Hetzner
@@ -231,6 +233,8 @@ GitHub Pages only hosts **static files** — it cannot run the Node.js/Express b
 
 ```
 cardcraft/
+├── docs/                   # Planning & reference docs
+│   └── ADMIN_DASHBOARD_ROADMAP.md  # Admin panel build tracker (Tier 1–4)
 ├── client/                 # React frontend
 │   ├── src/
 │   │   ├── components/     # Reusable UI components
