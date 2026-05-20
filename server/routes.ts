@@ -828,11 +828,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
     const logs: string[] = [];
     try {
-      // Create admin if doesn't exist
-      const existingAdmin = await storage.getUserByEmail("admin@cardcraft.com");
+      const adminEmail = "admin@cardcraft.com";
+      const adminPassword = "admin123";
+      const hashed = await bcrypt.hash(adminPassword, 12);
+
+      const existingAdmin = await storage.getUserByEmail(adminEmail);
+      let adminStatus: "created" | "reset";
       if (!existingAdmin) {
-        const hashed = await bcrypt.hash("admin123", 12);
-        await storage.createUser({ name: "Admin", email: "admin@cardcraft.com", password: hashed, role: "admin", tier: "pro" });
+        await storage.createUser({ name: "Admin", email: adminEmail, password: hashed, role: "admin", tier: "pro" });
+        adminStatus = "created";
+      } else {
+        await storage.updateUserPassword(existingAdmin.id, hashed);
+        if (existingAdmin.role !== "admin") await storage.updateUserRole(existingAdmin.id, "admin");
+        if (existingAdmin.tier !== "pro") await storage.updateUserTier(existingAdmin.id, "pro");
+        adminStatus = "reset";
       }
 
       // Migrate templates from SQLite to PostgreSQL
@@ -873,11 +882,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         logs.push(`Skipped (${existingTemplates} already exist)`);
       }
       
-      res.status(201).json({ 
-        message: "Seed complete", 
-        admin: existingAdmin ? "exists" : "created", 
+      res.status(201).json({
+        message: adminStatus === "created" ? "Admin account created" : "Admin account reset",
+        admin: adminStatus,
+        email: adminEmail,
+        password: adminPassword,
         templates,
-        logs 
+        logs,
       });
     } catch (e: any) {
       logs.push(`Fatal error: ${e.message}`);

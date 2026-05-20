@@ -213,14 +213,17 @@ GitHub Pages only hosts **static files** — it cannot run the Node.js/Express b
 
 ## 🔑 First-Time Setup (after deploy)
 
-**Production:** Create an admin user directly in the database (the in-app seed button only works on local dev).
+**Production:** Run `npm run db:seed-admin -- --email you@example.com --password 'YourSecurePass1!'` (requires `DATABASE_URL` in env). The in-app seed button is disabled in production.
 
 **Local development:**
 
 1. Run the app with `npm run dev`
-2. Go to `/admin` and click **"Create Admin Account"** — seeds `admin@cardcraft.com` / `admin123`
-3. Sign in and **immediately change the password** from Account Settings
-4. From the Admin panel → Users tab, you can upgrade any user to Pro
+2. Restore templates if the gallery is empty: `npm run db:seed` (requires `cardcraft.db` in project root)
+3. Add romance templates if missing: `npm run db:seed-love`
+4. Generate gallery preview images: `npm run db:previews` (uses Playwright + Fabric; re-run with `--force` to regenerate)
+5. Go to `/admin` and click **"Create Admin Account"** — creates or resets `admin@cardcraft.com` / `admin123` (or run `npm run db:seed-admin`)
+6. Sign in and **immediately change the password** from Account Settings
+7. From the Admin panel → Users tab, you can upgrade any user to Pro
 
 ---
 

@@ -22,6 +22,7 @@ import type { Template, Project } from "@shared/schema";
 import { SharePanel } from "../components/SharePanel";
 import { QRDialog } from "../components/QRDialog";
 import { useFabric } from "@/hooks/useFabric";
+import { loadDesignJson } from "@/lib/loadDesignJson";
 
 const FONTS = ["Georgia", "Arial", "Times New Roman", "Trebuchet MS", "Verdana", "Impact", "Great Vibes", "Courier New", "Tahoma", "Palatino", "Comic Sans MS", "Oswald", "Lucida Console", "Garamond"];
 
@@ -248,130 +249,43 @@ export default function Editor() {
   useEffect(() => {
     if (!canvasReady || !fabricRef.current) return;
     const canvas = fabricRef.current;
-    const f = (window as any).fabric;
 
-    const addObject = (obj: any, fabricObj: any) => {
-      if (obj.locked) { fabricObj.selectable = false; fabricObj.evented = false; }
-      canvas.add(fabricObj);
-    };
-
-    const buildGradient = (gradDef: any, objW: number, objH: number) => {
-      if (!gradDef || !f.Gradient) return null;
+    const loadJson = async (jsonStr: string) => {
       try {
-        const stops = (gradDef.colorStops || []).map((cs: any) => ({ offset: cs.offset, color: cs.color }));
-        if (gradDef.type === 'radial') {
-          return new f.Gradient({ type: 'radial', coords: {
-            x1: (gradDef.coords?.x1 ?? 0.5) * objW, y1: (gradDef.coords?.y1 ?? 0.5) * objH,
-            x2: (gradDef.coords?.x2 ?? 0.5) * objW, y2: (gradDef.coords?.y2 ?? 0.5) * objH,
-            r1: (gradDef.coords?.r1 ?? 0) * Math.max(objW, objH),
-            r2: (gradDef.coords?.r2 ?? 1) * Math.max(objW, objH),
-          }, colorStops: stops });
-        }
-        return new f.Gradient({ type: 'linear', coords: {
-          x1: (gradDef.coords?.x1 ?? 0) * objW, y1: (gradDef.coords?.y1 ?? 0) * objH,
-          x2: (gradDef.coords?.x2 ?? 1) * objW, y2: (gradDef.coords?.y2 ?? 0) * objH,
-        }, colorStops: stops });
-      } catch { return null; }
-    };
-
-    const loadJson = (jsonStr: string) => {
-      try {
-        const data = JSON.parse(jsonStr);
-        
-        // Sanitize canvas data: fix invalid textBaseline values
-        if (data.objects) {
-          data.objects.forEach((obj: any) => {
-            if (obj.textBaseline === "alphabetical") {
-              obj.textBaseline = "alphabetic";
+        const layout = await loadDesignJson(canvas, jsonStr, {
+          interactive: true,
+          maxWidth: MAX_CANVAS_W,
+          maxHeight: MAX_CANVAS_H,
+          beforeAdd: (obj, fabricObj) => {
+            if (obj.locked) {
+              fabricObj.selectable = false;
+              fabricObj.evented = false;
             }
-          });
-        }
-        
-        // Read canvas dimensions from template (default 800x1000 portrait)
-        const srcW = data.canvasWidth || 800;
-        const srcH = data.canvasHeight || 1000;
-        SRC_W = srcW; SRC_H = srcH;
-
-        // Compute display size preserving aspect ratio within max bounds
-        const aspect = srcW / srcH;
-        if (aspect >= 1) { CANVAS_W = MAX_CANVAS_W; CANVAS_H = Math.round(MAX_CANVAS_W / aspect); }
-        else { CANVAS_H = MAX_CANVAS_H; CANVAS_W = Math.round(MAX_CANVAS_H * aspect); }
-
-        canvas.setWidth(CANVAS_W);
-        canvas.setHeight(CANVAS_H);
-        canvas.clear();
-
-        const scaleX = CANVAS_W / srcW;
-        const scaleY = CANVAS_H / srcH;
-
-        if (data.background) canvas.setBackgroundColor(data.background, canvas.renderAll.bind(canvas));
-        if (!data.objects) { canvas.renderAll(); return; }
-
-        data.objects.forEach((obj: any) => {
-          const objW = (obj.width || (obj.radius || 50) * 2) * scaleX;
-          const objH = (obj.height || (obj.radius || 50) * 2) * scaleY;
-
-          const s: any = {
-            ...obj,
-            left: (obj.left || 0) * scaleX,
-            top: (obj.top || 0) * scaleY,
-            ...(obj.width !== undefined && { width: obj.width * scaleX }),
-            ...(obj.height !== undefined && { height: obj.height * scaleY }),
-            ...(obj.radius !== undefined && { radius: obj.radius * scaleX }),
-            ...(obj.fontSize !== undefined && { fontSize: Math.round(obj.fontSize * scaleX) }),
-            ...(obj.strokeWidth !== undefined && { strokeWidth: obj.strokeWidth * scaleX }),
-            ...(obj.rx !== undefined && { rx: obj.rx * scaleX }),
-            ...(obj.ry !== undefined && { ry: obj.ry * scaleY }),
-            scaleX: obj.scaleX || 1,
-            scaleY: obj.scaleY || 1,
-          };
-
-          if (obj.fillGradient) s.fill = buildGradient(obj.fillGradient, objW, objH);
-
-          if (obj.type === "rect") {
-            addObject(obj, new f.Rect(s));
-          } else if (obj.type === "circle") {
-            addObject(obj, new f.Circle(s));
-          } else if (obj.type === "text" || obj.type === "i-text" || obj.type === "textbox") {
-            // For text with gradient, use solid orange fallback at creation, then apply gradient after render
-            const textS = { ...s };
-            if (obj.fillGradient) textS.fill = obj.fillGradient.colorStops?.[1]?.color || '#f09820';
-            const textObj = new f.IText(obj.text, { ...textS, type: undefined });
-            addObject(obj, textObj);
-            if (obj.fillGradient) {
-              // Apply gradient after object is added and has computed dimensions
-              setTimeout(() => {
-                const tw = textObj.width || 300;
-                const th = textObj.height || 60;
-                const tg = buildGradient(obj.fillGradient, tw, th);
-                if (tg) { textObj.set('fill', tg); canvas.renderAll(); }
-              }, 50);
-            }
-          } else if (obj.type === "image" && obj.src) {
-            f.Image.fromURL(obj.src, (img: any) => {
-              img.set({ left: s.left, top: s.top, scaleX: obj.scaleX || 1, scaleY: obj.scaleY || 1 });
-              if (obj.locked) { img.selectable = false; img.evented = false; }
-              canvas.add(img);
-              canvas.renderAll();
-            }, { crossOrigin: "anonymous" });
-          }
+          },
         });
-        canvas.renderAll();
-        setTimeout(() => {
+
+        SRC_W = layout.srcWidth;
+        SRC_H = layout.srcHeight;
+        CANVAS_W = layout.displayWidth;
+        CANVAS_H = layout.displayHeight;
+
+        window.setTimeout(() => {
           historyRef.current = [];
           historyIndexRef.current = -1;
           saveHistory();
         }, 200);
-      } catch (e) { console.error("Failed to load canvas JSON", e); }
+      } catch (e) {
+        console.error("Failed to load canvas JSON", e);
+      }
     };
 
     if (project) {
       setProjectTitle(project.title);
       setProjectId(project.id);
-      loadJson(project.designJson);
+      void loadJson(project.designJson);
     } else if (template) {
       setProjectTitle(`${template.title} — ${new Date().toLocaleDateString()}`);
-      loadJson(template.canvasJson);
+      void loadJson(template.canvasJson);
     } else {
       canvas.setBackgroundColor("#1a0533", canvas.renderAll.bind(canvas));
       saveHistory();
@@ -1026,11 +940,19 @@ export default function Editor() {
   const [layers, setLayers] = useState<any[]>([]);
   useEffect(() => {
     if (!fabricRef.current) return;
-    const update = () => setLayers([...(fabricRef.current?.getObjects() || [])].reverse());
-    const c = fabricRef.current;
-    c.on("object:added", update); c.on("object:removed", update);
-    c.on("object:modified", update); c.on("after:render", update);
-    return () => { c.off("object:added", update); c.off("object:removed", update); };
+    const canvas = fabricRef.current;
+    const update = () => setLayers([...canvas.getObjects()].reverse());
+    update();
+    canvas.on("object:added", update);
+    canvas.on("object:removed", update);
+    canvas.on("object:modified", update);
+    canvas.on("after:render", update);
+    return () => {
+      canvas.off("object:added", update);
+      canvas.off("object:removed", update);
+      canvas.off("object:modified", update);
+      canvas.off("after:render", update);
+    };
   }, [canvasReady]);
 
   const getLayerLabel = (obj: any) => {
@@ -1102,7 +1024,7 @@ export default function Editor() {
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-background">
       {/* ── TOP BAR ──────────────────────────────────────────────────────── */}
-      <header className="flex items-center justify-between px-3 sm:px-4 h-12 border-b border-border bg-card flex-shrink-0 z-30">
+      <header className="flex items-center justify-between px-3 sm:px-4 h-13 min-h-[3.25rem] editor-toolbar flex-shrink-0 z-30">
         <div className="flex items-center gap-1.5">
           <Link href="/templates">
             <div className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors text-sm p-1.5 rounded-md hover:bg-secondary" data-testid="button-back">
@@ -1173,15 +1095,15 @@ export default function Editor() {
       <div className="flex flex-1 overflow-hidden">
 
         {/* ── LEFT PANEL ──────────────────────────────────────────────────── */}
-        <aside className="hidden lg:flex flex-col w-52 border-r border-border bg-card flex-shrink-0 overflow-y-auto editor-panel">
+        <aside className="hidden lg:flex flex-col w-56 border-r border-border editor-sidebar flex-shrink-0 overflow-y-auto">
           <div className="p-3 border-b border-border">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Layers</p>
+            <p className="panel-section-label">Layers</p>
           </div>
-          <div className="flex-1 p-2 space-y-0.5">
+          <div className="flex-1 p-2 space-y-0.5 max-h-[38vh] overflow-y-auto">
             {layers.map((obj, i) => (
               <button key={i}
                 onClick={() => { fabricRef.current?.setActiveObject(obj); fabricRef.current?.renderAll(); setSelectedObj(obj); }}
-                className={`w-full text-left px-2 py-1.5 rounded text-xs flex items-center gap-2 hover:bg-secondary transition-colors ${selectedObj === obj ? "bg-secondary text-foreground" : "text-muted-foreground"}`}
+                className={`layer-item ${selectedObj === obj ? "layer-item-active text-foreground" : "text-muted-foreground"}`}
                 data-testid={`button-layer-${i}`}
               >
                 {obj.type === "i-text" || obj.type === "text" || obj.type === "textbox" ? <Type size={10} /> : obj.type === "image" ? <ImageIcon size={10} /> : <Layers size={10} />}
@@ -1192,28 +1114,28 @@ export default function Editor() {
             {layers.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">No layers yet</p>}
           </div>
           <div className="p-3 border-t border-border space-y-1.5">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Add Element</p>
-            <button onClick={addText} className="w-full text-left text-xs px-3 py-2 rounded bg-secondary hover:bg-secondary/70 flex items-center gap-2" data-testid="button-add-text">
+            <p className="panel-section-label mb-2">Add Element</p>
+            <button onClick={addText} className="panel-action-btn" data-testid="button-add-text">
               <Type size={12} /> Add Text
             </button>
-            <label className={`w-full text-xs px-3 py-2 rounded flex items-center gap-2 cursor-pointer ${isUploading ? 'bg-secondary/50 opacity-50' : 'bg-secondary hover:bg-secondary/70'}`}>
-              <ImageIcon size={12} /> {isUploading ? 'Uploading...' : 'Add Photo'}
+            <label className={`panel-action-btn cursor-pointer ${isUploading ? "opacity-50 pointer-events-none" : ""}`}>
+              <ImageIcon size={12} /> {isUploading ? "Uploading..." : "Add Photo"}
               <input type="file" accept="image/*" className="hidden" disabled={isUploading} onChange={e => handleImageUpload(e)} data-testid="input-photo-upload" />
             </label>
-            <label className={`w-full text-xs px-3 py-2 rounded flex items-center gap-2 cursor-pointer ${isUploading ? 'bg-secondary/50 opacity-50' : 'bg-secondary hover:bg-secondary/70'}`}>
-              <Upload size={12} /> {isUploading ? 'Uploading...' : 'Add Logo'}
+            <label className={`panel-action-btn cursor-pointer ${isUploading ? "opacity-50 pointer-events-none" : ""}`}>
+              <Upload size={12} /> {isUploading ? "Uploading..." : "Add Logo"}
               <input type="file" accept="image/*" className="hidden" disabled={isUploading} onChange={e => handleImageUpload(e, true)} data-testid="input-logo-upload" />
             </label>
-            <button onClick={() => addShape("rect")} className="w-full text-left text-xs px-3 py-2 rounded bg-secondary hover:bg-secondary/70 flex items-center gap-2">
+            <button onClick={() => addShape("rect")} className="panel-action-btn">
               <Palette size={12} /> Rectangle
             </button>
-            <button onClick={() => addShape("circle")} className="w-full text-left text-xs px-3 py-2 rounded bg-secondary hover:bg-secondary/70 flex items-center gap-2">
+            <button onClick={() => addShape("circle")} className="panel-action-btn">
               <Palette size={12} /> Circle
             </button>
-            <button onClick={() => addShape("triangle")} className="w-full text-left text-xs px-3 py-2 rounded bg-secondary hover:bg-secondary/70 flex items-center gap-2">
+            <button onClick={() => addShape("triangle")} className="panel-action-btn">
               <Palette size={12} /> Triangle
             </button>
-            <button onClick={() => addShape("star")} className="w-full text-left text-xs px-3 py-2 rounded bg-secondary hover:bg-secondary/70 flex items-center gap-2">
+            <button onClick={() => addShape("star")} className="panel-action-btn">
               <Palette size={12} /> Star (Sticker)
             </button>
             <div className="pt-2 border-t border-border mt-2">

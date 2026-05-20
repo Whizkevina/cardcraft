@@ -7,40 +7,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
+import { EmptyState } from "@/components/marketing/EmptyState";
 import { FolderOpen, Edit3, Trash2, Plus, Clock, Copy, Check, Pencil } from "lucide-react";
 import type { Project } from "@shared/schema";
 import { format } from "date-fns";
 
-function EmptyState() {
+function EmptyProjects() {
   return (
-    <div className="text-center py-20 px-4">
-      {/* Animated illustration */}
-      <div className="relative w-32 h-32 mx-auto mb-6">
-        <div className="absolute inset-0 rounded-2xl bg-primary/10 animate-pulse" />
-        <div className="absolute inset-3 rounded-xl bg-primary/15 flex items-center justify-center">
-          <svg viewBox="0 0 80 80" fill="none" className="w-16 h-16">
-            <rect x="10" y="15" width="60" height="50" rx="6" fill="hsl(43 96% 58% / 0.2)" stroke="hsl(43 96% 58%)" strokeWidth="2"/>
-            <rect x="18" y="10" width="44" height="50" rx="5" fill="hsl(43 96% 58% / 0.15)" stroke="hsl(43 96% 58%)" strokeWidth="1.5"/>
-            <circle cx="40" cy="32" r="10" fill="hsl(43 96% 58% / 0.3)" stroke="hsl(43 96% 58%)" strokeWidth="1.5"/>
-            <rect x="24" y="48" width="32" height="3" rx="1.5" fill="hsl(43 96% 58% / 0.5)"/>
-            <rect x="28" y="54" width="24" height="2.5" rx="1.25" fill="hsl(43 96% 58% / 0.3)"/>
-          </svg>
-        </div>
-        {/* Floating sparkle */}
-        <div className="absolute -top-1 -right-1 w-6 h-6 bg-primary rounded-full flex items-center justify-center animate-bounce">
-          <span className="text-primary-foreground text-xs font-bold">+</span>
-        </div>
-      </div>
-      <h3 className="font-bold text-lg mb-2">No cards saved yet</h3>
-      <p className="text-muted-foreground text-sm max-w-xs mx-auto mb-6 leading-relaxed">
-        Design your first card — birthday, graduation, church event, or corporate celebration. Sign in to save and revisit anytime.
-      </p>
-      <Link href="/templates">
-        <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
-          <Plus size={15} /> Start Designing
-        </Button>
-      </Link>
-    </div>
+    <EmptyState
+      icon={FolderOpen}
+      title="No cards saved yet"
+      description="Design your first card — birthday, graduation, church event, or corporate celebration. Sign in to save and revisit anytime."
+      actions={[{ label: "Start Designing", href: "/templates", icon: Plus }]}
+    />
   );
 }
 
@@ -195,12 +174,15 @@ export default function Projects() {
     return (
       <div className="min-h-screen">
         <Navbar />
-        <div className="max-w-md mx-auto px-4 py-20 text-center">
-          <FolderOpen size={40} className="mx-auto text-muted-foreground mb-4" />
-          <h2 className="text-xl font-bold mb-2">Sign in to save cards</h2>
-          <p className="text-muted-foreground text-sm mb-6">Create a free account to save and revisit your designs.</p>
-          <Link href="/auth"><Button className="bg-primary text-primary-foreground hover:bg-primary/90">Sign In / Register</Button></Link>
-        </div>
+        <EmptyState
+          icon={FolderOpen}
+          title="Sign in to save cards"
+          description="Create a free account to save and revisit your designs."
+          actions={[
+            { label: "Sign In / Register", href: "/auth" },
+            { label: "Browse Templates", href: "/templates", variant: "outline" },
+          ]}
+        />
       </div>
     );
   }
@@ -233,7 +215,7 @@ export default function Projects() {
             ))}
           </div>
         ) : projects.length === 0 ? (
-          <EmptyState />
+          <EmptyProjects />
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             {projects.map(p => (

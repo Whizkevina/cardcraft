@@ -21,12 +21,13 @@ export default function Navbar() {
 
   const navLinks = [
     { href: "/templates", label: "Templates" },
+    { href: "/pricing", label: "Pricing" },
     ...(isPro ? [{ href: "/bulk", label: "Bulk Generate" }] : []),
   ];
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-card">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14">
+    <header className="sticky top-0 z-40 border-b border-border/80 navbar-glass">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
         {/* Logo */}
         <Link href="/">
           <div className="flex items-center gap-2 select-none" data-testid="link-home">
@@ -45,21 +46,21 @@ export default function Navbar() {
         <nav className="hidden md:flex items-center gap-1">
           {navLinks.map(({ href, label }) => (
             <Link key={href} href={href}>
-              <div className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${isActive(href) ? "bg-accent/20 text-gold" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}>
+              <div className={`px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${isActive(href) ? "nav-pill-active" : "text-muted-foreground hover:text-foreground hover:bg-secondary/80"}`}>
                 {label}
               </div>
             </Link>
           ))}
           {user && (
             <Link href="/projects">
-              <div className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${isActive("/projects") ? "bg-accent/20 text-gold" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}>
+              <div className={`px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${isActive("/projects") ? "nav-pill-active" : "text-muted-foreground hover:text-foreground hover:bg-secondary/80"}`}>
                 My Cards
               </div>
             </Link>
           )}
           {isAdmin && (
             <Link href="/admin">
-              <div className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${isActive("/admin") ? "bg-accent/20 text-gold" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}>
+              <div className={`px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${isActive("/admin") ? "nav-pill-active" : "text-muted-foreground hover:text-foreground hover:bg-secondary/80"}`}>
                 Admin
               </div>
             </Link>
@@ -147,7 +148,7 @@ export default function Navbar() {
                 <button className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 px-3" data-testid="button-login">Sign In</button>
               </Link>
               <Link href="/templates">
-                <button className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2" data-testid="button-get-started">Get Started</button>
+                <button className="inline-flex items-center justify-center rounded-lg text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring h-9 px-4 btn-gold" data-testid="button-get-started">Get Started</button>
               </Link>
             </div>
           )}

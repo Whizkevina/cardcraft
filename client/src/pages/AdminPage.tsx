@@ -202,9 +202,21 @@ export default function AdminPage() {
   });
 
   const seedAdmin = async () => {
-    const res = await apiRequest("POST", "/api/admin/seed");
-    const d = await res.json();
-    toast({ title: d.message, description: d.password ? `Email: ${d.email} · Password: ${d.password}` : d.email });
+    try {
+      const res = await apiRequest("POST", "/api/admin/seed");
+      const d = await res.json();
+      const creds = d.email && d.password ? `Email: ${d.email} · Password: ${d.password}` : undefined;
+      const resetNote = d.admin === "reset" ? " (existing account — password reset to default)" : undefined;
+      toast({ title: d.message, description: creds ? `${creds}${resetNote ?? ""}` : undefined });
+    } catch (e: any) {
+      toast({
+        title: "Could not seed admin",
+        description: e.message?.includes("403")
+          ? "Seed only works on local dev (127.0.0.1). Use npm run db:seed-admin for production."
+          : e.message,
+        variant: "destructive",
+      });
+    }
   };
 
   if (!user || !isAdmin) {

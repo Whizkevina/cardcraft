@@ -286,7 +286,11 @@ export default function BulkGenerate() {
               {templates.map(t => (
                 <SelectItem key={t.id} value={String(t.id)}>
                   <span className="flex items-center gap-2">
-                    <img alt="" aria-hidden="true" src={colorSwatchDataUri(t.thumbnailColor)} className="w-3 h-3 rounded-full inline-block object-cover" />
+                    {t.previewImage ? (
+                      <img alt="" aria-hidden="true" src={t.previewImage} className="w-6 h-7 rounded object-cover object-top inline-block" />
+                    ) : (
+                      <img alt="" aria-hidden="true" src={colorSwatchDataUri(t.thumbnailColor)} className="w-3 h-3 rounded-full inline-block object-cover" />
+                    )}
                     {t.title}
                   </span>
                 </SelectItem>

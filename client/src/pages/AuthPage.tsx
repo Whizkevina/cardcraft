@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Sparkles, Eye, EyeOff } from "lucide-react";
+import { Sparkles, Eye, EyeOff, Crown, FolderOpen } from "lucide-react";
 import { GoogleLogin } from "@react-oauth/google";
 import { isGoogleAuthConfigured } from "@/lib/googleAuth";
 
@@ -41,9 +41,9 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen flex">
-      {/* Left: form */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
-        <Link href="/" className="flex items-center gap-2 mb-8 hover:opacity-80 transition-opacity">
+      {/* Form */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 bg-background">
+        <Link href="/" className="flex items-center gap-2 mb-10 hover:opacity-80 transition-opacity">
           <svg aria-label="CardCraft" viewBox="0 0 32 32" fill="none" className="w-8 h-8">
             <rect width="32" height="32" rx="8" fill="hsl(43 96% 58%)"/>
             <rect x="6" y="8" width="20" height="16" rx="3" fill="none" stroke="hsl(240 20% 7%)" strokeWidth="2"/>
@@ -52,12 +52,12 @@ export default function AuthPage() {
           <span className="text-xl font-bold logo-text">CardCraft</span>
         </Link>
 
-        <div className="w-full max-w-sm">
+        <div className="w-full max-w-sm premium-card rounded-2xl p-6 sm:p-8">
           <h1 className="text-2xl font-bold mb-1 font-display">
             {mode === "login" ? "Welcome back" : "Create account"}
           </h1>
           <p className="text-muted-foreground text-sm mb-6">
-            {mode === "login" ? "Sign in to access your saved cards." : "Save and revisit your birthday card designs."}
+            {mode === "login" ? "Sign in to access your saved cards." : "Save and revisit your card designs anytime."}
           </p>
 
           <form onSubmit={submit} className="space-y-4">
@@ -68,7 +68,7 @@ export default function AuthPage() {
                   id="name" type="text" value={name}
                   onChange={e => setName(e.target.value)}
                   placeholder="John Doe" required
-                  className="h-10" data-testid="input-name"
+                  className="h-10 bg-background" data-testid="input-name"
                 />
               </div>
             )}
@@ -79,7 +79,7 @@ export default function AuthPage() {
                 id="email" type="email" value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder="you@example.com" required
-                className="h-10" data-testid="input-email"
+                className="h-10 bg-background" data-testid="input-email"
               />
             </div>
 
@@ -92,7 +92,7 @@ export default function AuthPage() {
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••" required
-                  className="h-10 pr-10"
+                  className="h-10 pr-10 bg-background"
                   data-testid="input-password"
                 />
                 <button
@@ -105,7 +105,7 @@ export default function AuthPage() {
               </div>
             </div>
 
-            <Button type="submit" disabled={loading} className="w-full bg-primary text-primary-foreground hover:bg-primary/90 h-10 gap-2" data-testid="button-submit-auth">
+            <Button type="submit" disabled={loading} className="w-full btn-gold h-10 gap-2" data-testid="button-submit-auth">
               <Sparkles size={14} />
               {loading ? "Please wait..." : mode === "login" ? "Sign In" : "Create Account"}
             </Button>
@@ -118,7 +118,7 @@ export default function AuthPage() {
                   <span className="w-full border-t border-border" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-3 text-muted-foreground font-medium">Or continue with</span>
+                  <span className="bg-card px-3 text-muted-foreground font-medium">Or continue with</span>
                 </div>
               </div>
 
@@ -158,32 +158,36 @@ export default function AuthPage() {
           {mode === "login" && (
             <div className="pt-2">
               <Link href="/forgot-password" className="text-xs text-muted-foreground hover:text-primary transition-colors block text-center">
-                  Forgot your password?
+                Forgot your password?
               </Link>
             </div>
           )}
           <div className="mt-4 pt-4 border-t border-border">
             <Link href="/templates" className="text-xs text-muted-foreground hover:text-foreground text-center block transition-colors">
-                ← Continue without account (guest mode)
+              ← Continue without account (guest mode)
             </Link>
           </div>
         </div>
       </div>
 
-      {/* Right: decorative */}
-      <div className="hidden md:flex flex-1 items-center justify-center bg-secondary relative overflow-hidden">
+      {/* Hero panel */}
+      <div className="hidden md:flex flex-1 items-center justify-center relative overflow-hidden">
         <div className="absolute inset-0 auth-hero-gradient" />
-        <div className="relative z-10 text-center p-10">
-          <div className="w-32 h-40 mx-auto rounded-2xl border-2 border-yellow-400/50 mb-6 flex items-center justify-center auth-hero-card">
-            <div className="text-yellow-400 opacity-50">
-              <svg viewBox="0 0 24 24" fill="none" className="w-12 h-12">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="1.5"/>
-                <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="1.5"/>
-              </svg>
+        <div className="relative z-10 text-center p-10 max-w-md">
+          <div className="w-36 h-44 mx-auto rounded-2xl border-2 border-yellow-400/40 mb-8 flex items-center justify-center auth-hero-card">
+            <div className="text-center px-4">
+              <FolderOpen size={32} className="text-yellow-400/70 mx-auto mb-3" />
+              <p className="text-yellow-400/90 text-xs font-medium">Your saved designs</p>
             </div>
           </div>
-          <p className="text-yellow-400 text-sm font-medium mb-1">Save up to 5 cards free</p>
-          <p className="text-white/60 text-xs max-w-xs">Registered users can save drafts, reopen designs, and upgrade to Pro for unlimited storage and bulk generation.</p>
+          <p className="text-yellow-400 text-lg font-semibold mb-2 font-display">Save up to 5 cards free</p>
+          <p className="text-white/55 text-sm leading-relaxed mb-6">
+            Registered users can save drafts, reopen designs, and upgrade to Pro for unlimited storage and bulk generation.
+          </p>
+          <div className="flex items-center justify-center gap-2 text-xs text-white/40">
+            <Crown size={12} className="text-yellow-400/60" />
+            <span>Pro unlocks bulk CSV generation &amp; no watermark</span>
+          </div>
         </div>
       </div>
     </div>
