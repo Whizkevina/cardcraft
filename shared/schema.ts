@@ -77,6 +77,19 @@ export const insertPaymentSchema = createInsertSchema(payments).omit({ id: true,
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 export type Payment = typeof payments.$inferSelect;
 
+// ─── Admin audit log ──────────────────────────────────────────────────────────
+export const adminAuditLog = pgTable("admin_audit_log", {
+  id: serial("id").primaryKey(),
+  actorId: integer("actor_id").notNull(),
+  action: text("action").notNull(),
+  targetType: text("target_type").notNull(),
+  targetId: integer("target_id"),
+  meta: text("meta"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type AdminAuditLog = typeof adminAuditLog.$inferSelect;
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 export const FREE_DOWNLOAD_LIMIT = 3;
 export const FREE_PROJECT_LIMIT = 5;

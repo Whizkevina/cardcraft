@@ -2,7 +2,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { Pool } from "pg";
 import * as schema from "@shared/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and, ilike } from "drizzle-orm";
 import crypto from "crypto";
 import type { User, InsertUser, Template, InsertTemplate, Project, InsertProject, Payment, InsertPayment } from "@shared/schema";
 
@@ -69,6 +69,16 @@ export async function initDb() {
   await qc`CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id)`;
   await qc`CREATE INDEX IF NOT EXISTS idx_projects_share_token ON projects(share_token)`;
   await qc`CREATE INDEX IF NOT EXISTS idx_payments_user_id ON payments(user_id)`;
+  await qc`CREATE TABLE IF NOT EXISTS admin_audit_log (
+    id SERIAL PRIMARY KEY,
+    actor_id INTEGER NOT NULL,
+    action TEXT NOT NULL,
+    target_type TEXT NOT NULL,
+    target_id INTEGER,
+    meta TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`;
+  await qc`CREATE INDEX IF NOT EXISTS idx_admin_audit_log_created ON admin_audit_log(created_at DESC)`;
   console.log("[DB] ✅ Database initialized successfully");
   await qc.end(); // close this single-purpose connection pool so we don't block
 }
@@ -196,6 +206,107 @@ export class Storage {
   async getPaymentsByUser(userId: number): Promise<Payment[]> { return getDb().select().from(schema.payments).where(eq(schema.payments.userId, userId)).orderBy(desc(schema.payments.createdAt)); }
   async createPayment(data: InsertPayment): Promise<Payment> { const [p] = await getDb().insert(schema.payments).values(data).returning(); return p; }
   async updatePaymentStatus(reference: string, status: "success" | "failed"): Promise<Payment | undefined> { const [p] = await getDb().update(schema.payments).set({ status }).where(eq(schema.payments.reference, reference)).returning(); return p; }
+
+  async logAdminAction(
+    actorId: number,
+    action: string,
+    targetType: string,
+    targetId: number | null,
+    meta?: Record<string, unknown>,
+  ): Promise<void> {
+    await getDb().insert(schema.adminAuditLog).values({
+      actorId,
+      action,
+      targetType,
+      targetId,
+      meta: meta ? JSON.stringify(meta) : null,
+    });
+  }
+
+  async getAuditLogs(limit = 100) {
+    return getDb()
+      .select({
+        id: schema.adminAuditLog.id,
+        actorId: schema.adminAuditLog.actorId,
+        actorName: schema.users.name,
+        action: schema.adminAuditLog.action,
+        targetType: schema.adminAuditLog.targetType,
+        targetId: schema.adminAuditLog.targetId,
+        meta: schema.adminAuditLog.meta,
+        createdAt: schema.adminAuditLog.createdAt,
+      })
+      .from(schema.adminAuditLog)
+      .leftJoin(schema.users, eq(schema.adminAuditLog.actorId, schema.users.id))
+      .orderBy(desc(schema.adminAuditLog.createdAt))
+      .limit(limit);
+  }
+
+  async getProjectStatsByUser(): Promise<Record<number, { projectCount: number; sharedCount: number }>> {
+    const rows = await getDb()
+      .select({
+        userId: schema.projects.userId,
+        projectCount: sql<number>`count(*)::int`,
+        sharedCount: sql<number>`coalesce(sum(case when share_enabled then 1 else 0 end), 0)::int`,
+      })
+      .from(schema.projects)
+      .groupBy(schema.projects.userId);
+    const map: Record<number, { projectCount: number; sharedCount: number }> = {};
+    for (const row of rows) {
+      map[row.userId] = { projectCount: row.projectCount, sharedCount: row.sharedCount };
+    }
+    return map;
+  }
+
+  async getAdminUserDetail(userId: number) {
+    const user = await this.getUser(userId);
+    if (!user) return undefined;
+    const stats = (await this.getProjectStatsByUser())[userId] ?? { projectCount: 0, sharedCount: 0 };
+    const payments = await this.getPaymentsByUser(userId);
+    return { user, stats, payments };
+  }
+
+  async getAdminPayments(filters: { status?: string; email?: string; limit?: number } = {}) {
+    const conditions = [];
+    if (filters.status && ["pending", "success", "failed"].includes(filters.status)) {
+      conditions.push(eq(schema.payments.status, filters.status as "pending" | "success" | "failed"));
+    }
+    if (filters.email?.trim()) {
+      conditions.push(ilike(schema.users.email, `%${filters.email.trim()}%`));
+    }
+    const whereClause = conditions.length ? and(...conditions) : undefined;
+    return getDb()
+      .select({
+        id: schema.payments.id,
+        userId: schema.payments.userId,
+        userName: schema.users.name,
+        userEmail: schema.users.email,
+        reference: schema.payments.reference,
+        amount: schema.payments.amount,
+        currency: schema.payments.currency,
+        status: schema.payments.status,
+        plan: schema.payments.plan,
+        createdAt: schema.payments.createdAt,
+      })
+      .from(schema.payments)
+      .innerJoin(schema.users, eq(schema.payments.userId, schema.users.id))
+      .where(whereClause)
+      .orderBy(desc(schema.payments.createdAt))
+      .limit(filters.limit ?? 100);
+  }
+
+  async getPaymentsRevenueThisMonth(): Promise<number> {
+    const start = new Date();
+    start.setDate(1);
+    start.setHours(0, 0, 0, 0);
+    const [row] = await getDb()
+      .select({ sum: sql<number>`coalesce(sum(${schema.payments.amount}), 0)` })
+      .from(schema.payments)
+      .where(and(
+        eq(schema.payments.status, "success"),
+        sql`${schema.payments.createdAt} >= ${start.toISOString()}`,
+      ));
+    return Number(row?.sum ?? 0);
+  }
 }
 
 export const storage = new Storage();

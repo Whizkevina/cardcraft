@@ -85,8 +85,33 @@ const safeUser = (u: any) => ({
   theme: u.theme || "dark",
   downloadsToday: u.downloadsToday || 0,
   lastDownloadDate: u.lastDownloadDate,
+  createdAt: u.createdAt,
   // NEVER include: password, resetToken, resetTokenExpiry
 });
+
+const safeAdminUser = (u: any, stats?: { projectCount: number; sharedCount: number }) => ({
+  ...safeUser(u),
+  projectCount: stats?.projectCount ?? 0,
+  sharedCount: stats?.sharedCount ?? 0,
+});
+
+const safePayment = (p: any) => ({
+  id: p.id,
+  userId: p.userId,
+  userName: p.userName,
+  userEmail: p.userEmail,
+  reference: p.reference,
+  amount: p.amount,
+  currency: p.currency,
+  status: p.status,
+  plan: p.plan,
+  createdAt: p.createdAt,
+});
+
+async function logAdmin(req: any, action: string, targetType: string, targetId: number | null, meta?: Record<string, unknown>) {
+  if (!req.session.userId) return;
+  await storage.logAdminAction(req.session.userId, action, targetType, targetId, meta);
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function generateRef() {
@@ -537,16 +562,22 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.patch("/api/templates/:id", requireAuth, requireAdmin, async (req, res) => {
     const id = safeId(req.params.id);
     if (!id) return res.status(400).json({ error: "Invalid ID" });
+    const before = await storage.getTemplate(id);
     const clean = sanitiseTemplateBody(req.body);
     const t = await storage.updateTemplate(id, clean);
     if (!t) return res.status(404).json({ error: "Not found" });
+    if (clean.status && before && before.status !== clean.status) {
+      await logAdmin(req, "template.status_change", "template", id, { from: before.status, to: clean.status, title: t.title });
+    }
     res.json(t);
   });
 
   app.delete("/api/templates/:id", requireAuth, requireAdmin, async (req, res) => {
     const id = safeId(req.params.id);
     if (!id) return res.status(400).json({ error: "Invalid ID" });
+    const before = await storage.getTemplate(id);
     await storage.deleteTemplate(id);
+    if (before) await logAdmin(req, "template.delete", "template", id, { title: before.title });
     res.json({ ok: true });
   });
 
@@ -793,18 +824,37 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.get("/api/admin/users", requireAuth, requireAdmin, async (req, res) => {
-    const users = await storage.getAllUsers();
-    res.json(users.map(safeUser));
+    const [users, statsMap] = await Promise.all([storage.getAllUsers(), storage.getProjectStatsByUser()]);
+    res.json(users.map(u => safeAdminUser(u, statsMap[u.id])));
+  });
+
+  app.get("/api/admin/users/:id", requireAuth, requireAdmin, async (req, res) => {
+    const id = safeId(req.params.id);
+    if (!id) return res.status(400).json({ error: "Invalid ID" });
+    const detail = await storage.getAdminUserDetail(id);
+    if (!detail) return res.status(404).json({ error: "Not found" });
+    res.json({
+      user: safeAdminUser(detail.user, detail.stats),
+      payments: detail.payments.map(p => safePayment({ ...p, userName: detail.user.name, userEmail: detail.user.email })),
+    });
   });
 
   app.patch("/api/admin/users/:id/tier", requireAuth, requireAdmin, async (req, res) => {
     const id = safeId(req.params.id);
     if (!id) return res.status(400).json({ error: "Invalid ID" });
-    const { tier } = req.body;
+    const { tier, reason } = req.body;
     if (!["free", "pro"].includes(tier)) return res.status(400).json({ error: "Invalid tier" });
+    const before = await storage.getUser(id);
+    if (!before) return res.status(404).json({ error: "Not found" });
     const user = await storage.updateUserTier(id, tier);
     if (!user) return res.status(404).json({ error: "Not found" });
-    res.json(safeUser(user));
+    await logAdmin(req, "user.tier_change", "user", id, {
+      from: before.tier,
+      to: tier,
+      email: before.email,
+      reason: typeof reason === "string" ? reason.slice(0, 500) : undefined,
+    });
+    res.json(safeAdminUser(user, (await storage.getProjectStatsByUser())[id]));
   });
 
   app.patch("/api/admin/users/:id/role", requireAuth, requireAdmin, async (req, res) => {
@@ -812,11 +862,31 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (!id) return res.status(400).json({ error: "Invalid ID" });
     const { role } = req.body;
     if (!["user", "admin"].includes(role)) return res.status(400).json({ error: "Invalid role" });
-    // Prevent self-demotion
     if (id === req.session.userId) return res.status(400).json({ error: "Cannot change your own role" });
+    const before = await storage.getUser(id);
+    if (!before) return res.status(404).json({ error: "Not found" });
     const user = await storage.updateUserRole(id, role);
     if (!user) return res.status(404).json({ error: "Not found" });
-    res.json(safeUser(user));
+    await logAdmin(req, "user.role_change", "user", id, { from: before.role, to: role, email: before.email });
+    res.json(safeAdminUser(user, (await storage.getProjectStatsByUser())[id]));
+  });
+
+  app.get("/api/admin/payments", requireAuth, requireAdmin, async (req, res) => {
+    const status = typeof req.query.status === "string" ? req.query.status : undefined;
+    const email = typeof req.query.email === "string" ? req.query.email : undefined;
+    const [payments, revenueThisMonth] = await Promise.all([
+      storage.getAdminPayments({ status, email }),
+      storage.getPaymentsRevenueThisMonth(),
+    ]);
+    res.json({ payments: payments.map(safePayment), revenueThisMonth });
+  });
+
+  app.get("/api/admin/audit-log", requireAuth, requireAdmin, async (req, res) => {
+    const logs = await storage.getAuditLogs(100);
+    res.json(logs.map((l: { meta: string | null; [key: string]: unknown }) => ({
+      ...l,
+      meta: l.meta ? (() => { try { return JSON.parse(l.meta); } catch { return l.meta; } })() : null,
+    })));
   });
 
   app.post("/api/admin/seed", async (req, res) => {

@@ -6,14 +6,18 @@ import Navbar from "../components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Shield, Plus, Eye, EyeOff, Trash2, Users, Sparkles, Crown, Search, TrendingUp, CreditCard, LayoutTemplate, UserPlus, Pencil } from "lucide-react";
+import { Shield, Plus, Eye, EyeOff, Trash2, Users, Sparkles, Crown, Search, TrendingUp, CreditCard, LayoutTemplate, UserPlus, Pencil, ScrollText, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
 import type { Template } from "@shared/schema";
-import type { AuthUser } from "../components/AuthProvider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { colorSwatchDataUri } from "@/lib/utils";
+import { UserDetailSheet } from "@/components/admin/UserDetailSheet";
+import { AdminPaymentsTab } from "@/components/admin/AdminPaymentsTab";
+import { AdminAuditTab } from "@/components/admin/AdminAuditTab";
+import type { AdminUser } from "@/components/admin/types";
 
 const progressWidthClass = (uses: number, topUses: number) => {
   const percentage = topUses > 0 ? (uses / topUses) * 100 : 0;
@@ -78,11 +82,24 @@ function TemplateRow({ template, onToggle, onDelete }: { template: Template; onT
 }
 
 // ─── User row ─────────────────────────────────────────────────────────────────
-function UserRow({ user, currentUserId, onTierChange, onRoleChange }: { user: AuthUser; currentUserId: number; onTierChange: (id: number, tier: "free" | "pro") => void; onRoleChange: (id: number, role: "user" | "admin") => void }) {
+function UserRow({ user, currentUserId, onSelect, onTierChange, onRoleChange }: {
+  user: AdminUser;
+  currentUserId: number;
+  onSelect: (user: AdminUser) => void;
+  onTierChange: (id: number, tier: "free" | "pro") => void;
+  onRoleChange: (id: number, role: "user" | "admin") => void;
+}) {
   const isPro = user.tier === "pro";
   const isAdmin = user.role === "admin";
   return (
-    <div className="flex items-center justify-between p-3.5 rounded-xl border border-border bg-card gap-3" data-testid={`row-user-${user.id}`}>
+    <div
+      className="flex items-center justify-between p-3.5 rounded-xl border border-border bg-card gap-3 cursor-pointer hover:border-primary/30 transition-colors group"
+      data-testid={`row-user-${user.id}`}
+      onClick={() => onSelect(user)}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(user); } }}
+      role="button"
+      tabIndex={0}
+    >
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="font-semibold text-sm truncate">{user.name}</span>
@@ -91,22 +108,31 @@ function UserRow({ user, currentUserId, onTierChange, onRoleChange }: { user: Au
           {isAdmin && <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-secondary text-muted-foreground border border-border"><Shield size={8} /> ADMIN</span>}
         </div>
         <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-        <p className="text-[10px] text-muted-foreground">{isPro ? "Unlimited downloads" : `${user.downloadsToday || 0}/3 today`}</p>
+        <p className="text-[10px] text-muted-foreground">
+          {user.projectCount} project{user.projectCount !== 1 ? "s" : ""}
+          {user.createdAt ? ` · joined ${format(new Date(user.createdAt), "dd MMM yyyy")}` : ""}
+          {!isPro && ` · ${user.downloadsToday || 0}/3 downloads today`}
+        </p>
       </div>
       <div className="flex items-center gap-1.5 flex-shrink-0">
-        <button onClick={() => onTierChange(user.id, isPro ? "free" : "pro")}
+        <button
+          onClick={(e) => { e.stopPropagation(); onTierChange(user.id, isPro ? "free" : "pro"); }}
           className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all border ${isPro ? "bg-primary/10 text-primary border-primary/30 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30" : "bg-secondary text-muted-foreground border-border hover:bg-primary/10 hover:text-primary hover:border-primary/30"}`}
-          data-testid={`button-tier-${user.id}`}>
+          data-testid={`button-tier-${user.id}`}
+        >
           <Sparkles size={10} /> {isPro ? "Pro" : "Free"}
         </button>
         {user.id !== currentUserId && (
-          <button onClick={() => onRoleChange(user.id, isAdmin ? "user" : "admin")}
+          <button
+            onClick={(e) => { e.stopPropagation(); onRoleChange(user.id, isAdmin ? "user" : "admin"); }}
             title={isAdmin ? "Remove admin role" : "Make admin"}
             className={`p-1.5 rounded hover:bg-secondary transition-colors ${isAdmin ? "text-gold" : "text-muted-foreground hover:text-foreground"}`}
-            data-testid={`button-role-${user.id}`}>
+            data-testid={`button-role-${user.id}`}
+          >
             <Shield size={13} />
           </button>
         )}
+        <ChevronRight size={14} className="text-muted-foreground/40 group-hover:text-muted-foreground" />
       </div>
     </div>
   );
@@ -164,6 +190,12 @@ export default function AdminPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [userSearch, setUserSearch] = useState("");
+  const [tierFilter, setTierFilter] = useState<string>("all");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<string>("newest");
+  const [atCapOnly, setAtCapOnly] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const { data: analytics } = useQuery({
     queryKey: ["/api/admin/analytics"],
@@ -178,7 +210,7 @@ export default function AdminPage() {
     enabled: isAdmin,
   });
 
-  const { data: users = [], isLoading: usersLoading } = useQuery<AuthUser[]>({
+  const { data: users = [], isLoading: usersLoading } = useQuery<AdminUser[]>({
     queryKey: ["/api/admin/users"],
     queryFn: async () => { const r = await apiRequest("GET", "/api/admin/users"); return r.json(); },
     enabled: isAdmin,
@@ -193,13 +225,31 @@ export default function AdminPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/templates"] }); toast({ title: "Template deleted" }); },
   });
   const changeTier = useMutation({
-    mutationFn: async ({ id, tier }: { id: number; tier: "free" | "pro" }) => { const r = await apiRequest("PATCH", `/api/admin/users/${id}/tier`, { tier }); if (!r.ok) throw new Error("Failed"); },
-    onSuccess: (_, v) => { qc.invalidateQueries({ queryKey: ["/api/admin/users"] }); toast({ title: `User ${v.tier === "pro" ? "upgraded to Pro" : "moved to Free"}` }); },
+    mutationFn: async ({ id, tier, reason }: { id: number; tier: "free" | "pro"; reason?: string }) => {
+      const r = await apiRequest("PATCH", `/api/admin/users/${id}/tier`, { tier, reason });
+      if (!r.ok) throw new Error("Failed");
+    },
+    onSuccess: (_, v) => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      qc.invalidateQueries({ queryKey: ["admin-user-detail", v.id] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/audit-log"] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/analytics"] });
+      toast({ title: `User ${v.tier === "pro" ? "upgraded to Pro" : "moved to Free"}` });
+    },
   });
   const changeRole = useMutation({
     mutationFn: async ({ id, role }: { id: number; role: "user" | "admin" }) => { await apiRequest("PATCH", `/api/admin/users/${id}/role`, { role }); },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/admin/users"] }); toast({ title: "Role updated" }); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/audit-log"] });
+      toast({ title: "Role updated" });
+    },
   });
+
+  const openUserDetail = (user: AdminUser) => {
+    setSelectedUser(user);
+    setDetailOpen(true);
+  };
 
   const seedAdmin = async () => {
     try {
@@ -233,7 +283,31 @@ export default function AdminPage() {
     );
   }
 
-  const filteredUsers = userSearch ? users.filter(u => u.name.toLowerCase().includes(userSearch.toLowerCase()) || u.email.toLowerCase().includes(userSearch.toLowerCase())) : users;
+  const filteredUsers = users
+    .filter(u => {
+      if (userSearch) {
+        const q = userSearch.toLowerCase();
+        if (!u.name.toLowerCase().includes(q) && !u.email.toLowerCase().includes(q)) return false;
+      }
+      if (tierFilter === "pro" && u.tier !== "pro") return false;
+      if (tierFilter === "free" && u.tier !== "free") return false;
+      if (roleFilter === "admin" && u.role !== "admin") return false;
+      if (roleFilter === "user" && u.role !== "user") return false;
+      if (atCapOnly && (u.tier === "pro" || (u.downloadsToday || 0) < 3)) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === "projects") return b.projectCount - a.projectCount;
+      if (sortBy === "downloads") return (b.downloadsToday || 0) - (a.downloadsToday || 0);
+      if (sortBy === "oldest") {
+        const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return ta - tb;
+      }
+      const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return tb - ta;
+    });
 
   return (
     <div className="min-h-screen">
@@ -251,6 +325,8 @@ export default function AdminPage() {
           <TabsList className="mb-6">
             <TabsTrigger value="analytics" className="gap-2"><TrendingUp size={14} /> Analytics</TabsTrigger>
             <TabsTrigger value="users" className="gap-2"><Users size={14} /> Users ({users.length})</TabsTrigger>
+            <TabsTrigger value="payments" className="gap-2"><CreditCard size={14} /> Payments</TabsTrigger>
+            <TabsTrigger value="activity" className="gap-2"><ScrollText size={14} /> Activity</TabsTrigger>
             <TabsTrigger value="templates" className="gap-2"><LayoutTemplate size={14} /> Templates ({templates.length})</TabsTrigger>
           </TabsList>
 
@@ -330,14 +406,78 @@ export default function AdminPage() {
           {/* ── Users ──────────────────────────────────────────────────── */}
           <TabsContent value="users">
             <div className="space-y-3">
-              <div className="relative">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input placeholder="Search by name or email…" value={userSearch} onChange={e => setUserSearch(e.target.value)} className="pl-9 h-9 text-sm" data-testid="input-user-search" />
+              <div className="flex flex-col lg:flex-row gap-2">
+                <div className="relative flex-1">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input placeholder="Search by name or email…" value={userSearch} onChange={e => setUserSearch(e.target.value)} className="pl-9 h-9 text-sm" data-testid="input-user-search" />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Select value={tierFilter} onValueChange={setTierFilter}>
+                    <SelectTrigger className="w-[110px] h-9 text-xs" data-testid="select-tier-filter">
+                      <SelectValue placeholder="Tier" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All tiers</SelectItem>
+                      <SelectItem value="pro">Pro only</SelectItem>
+                      <SelectItem value="free">Free only</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={roleFilter} onValueChange={setRoleFilter}>
+                    <SelectTrigger className="w-[120px] h-9 text-xs" data-testid="select-role-filter">
+                      <SelectValue placeholder="Role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All roles</SelectItem>
+                      <SelectItem value="admin">Admins</SelectItem>
+                      <SelectItem value="user">Users</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={sortBy} onValueChange={setSortBy}>
+                    <SelectTrigger className="w-[130px] h-9 text-xs" data-testid="select-user-sort">
+                      <SelectValue placeholder="Sort" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="newest">Newest first</SelectItem>
+                      <SelectItem value="oldest">Oldest first</SelectItem>
+                      <SelectItem value="projects">Most projects</SelectItem>
+                      <SelectItem value="downloads">Most downloads</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant={atCapOnly ? "default" : "outline"}
+                    size="sm"
+                    className="h-9 text-xs"
+                    onClick={() => setAtCapOnly(v => !v)}
+                    data-testid="button-at-cap-filter"
+                  >
+                    At download cap
+                  </Button>
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground px-1">Click tier badge to toggle Free ↔ Pro · Click shield to toggle admin role</p>
+              <p className="text-xs text-muted-foreground px-1">
+                Click a user for full profile · Toggle tier/role inline · {filteredUsers.length} shown
+              </p>
               {usersLoading ? <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-16 skeleton rounded-xl" />)}</div>
-                : filteredUsers.map(u => <UserRow key={u.id} user={u} currentUserId={user.id} onTierChange={(id,tier) => changeTier.mutate({id,tier})} onRoleChange={(id,role) => changeRole.mutate({id,role})} />)}
+                : filteredUsers.map(u => (
+                  <UserRow
+                    key={u.id}
+                    user={u}
+                    currentUserId={user.id}
+                    onSelect={openUserDetail}
+                    onTierChange={(id, tier) => changeTier.mutate({ id, tier })}
+                    onRoleChange={(id, role) => changeRole.mutate({ id, role })}
+                  />
+                ))}
             </div>
+          </TabsContent>
+
+          <TabsContent value="payments">
+            <AdminPaymentsTab />
+          </TabsContent>
+
+          <TabsContent value="activity">
+            <AdminAuditTab />
           </TabsContent>
 
           {/* ── Templates ──────────────────────────────────────────────── */}
@@ -348,6 +488,18 @@ export default function AdminPage() {
             </div>
           </TabsContent>
         </Tabs>
+
+        <UserDetailSheet
+          previewUser={selectedUser}
+          open={detailOpen}
+          onOpenChange={(open) => {
+            setDetailOpen(open);
+            if (!open) setSelectedUser(null);
+          }}
+          currentUserId={user.id}
+          onTierChange={(id, tier, reason) => changeTier.mutate({ id, tier, reason })}
+          onRoleChange={(id, role) => changeRole.mutate({ id, role })}
+        />
       </main>
     </div>
   );
