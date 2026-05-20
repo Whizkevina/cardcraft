@@ -10,8 +10,18 @@ const ensureDbUrl = () => {
 export const resetDatabase = async () => {
   const client = new Client({ connectionString: ensureDbUrl() });
   await client.connect();
-  await client.query("TRUNCATE TABLE \"session\", payments, projects, templates, users RESTART IDENTITY CASCADE");
+  await client.query(
+    'TRUNCATE TABLE "session", admin_audit_log, payments, projects, templates, users RESTART IDENTITY CASCADE'
+  );
   await client.end();
+};
+
+export const getTemplateCount = async (): Promise<number> => {
+  const client = new Client({ connectionString: ensureDbUrl() });
+  await client.connect();
+  const result = await client.query("SELECT COUNT(*)::int AS count FROM templates");
+  await client.end();
+  return result.rows[0]?.count ?? 0;
 };
 
 export const setUserTier = async (email: string, tier: "free" | "pro") => {

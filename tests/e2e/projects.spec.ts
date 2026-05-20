@@ -9,6 +9,13 @@ test("save a project and view it in My Cards", async ({ page }) => {
 
   await page.goto("/#/editor/t/1");
   await dismissCookieBanner(page);
+  await page.waitForResponse(
+    (response) => {
+      const url = response.url();
+      return response.ok() && (url.includes("/api/templates/1") || url.includes("/api/templates"));
+    },
+    { timeout: 30000 },
+  );
   await waitForCanvasReady(page);
 
   const title = `E2E Project ${Date.now()}`;

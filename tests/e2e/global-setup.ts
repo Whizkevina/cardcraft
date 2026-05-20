@@ -1,22 +1,27 @@
 import { initDb } from "../../server/storage";
-import { resetDatabase, seedTemplate } from "./helpers/db";
+import { resetDatabase, seedTemplate, getTemplateCount } from "./helpers/db";
 
 export default async function globalSetup() {
   if (!process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL is required for e2e tests.");
   }
 
-  // Never wipe a shared/production database unless explicitly opted in.
-  if (process.env.E2E_RESET_DB !== "true") {
+  await initDb();
+
+  if (process.env.E2E_RESET_DB === "true") {
+    console.log("[e2e] Resetting test database…");
+    await resetDatabase();
+  } else {
     console.warn(
-      "[e2e] Skipping DB reset (set E2E_RESET_DB=true in .env.test to truncate before tests). " +
-        "Ensure templates exist — run: npx tsx script/seed-templates.ts"
+      "[e2e] Skipping DB reset (set E2E_RESET_DB=true for a clean slate each run)."
     );
-    await initDb();
-    return;
   }
 
-  await initDb();
-  await resetDatabase();
-  await seedTemplate();
+  const templateCount = await getTemplateCount();
+  if (templateCount === 0) {
+    console.log("[e2e] No templates found — seeding default test template");
+    await seedTemplate();
+  } else {
+    console.log(`[e2e] Templates ready (${templateCount} in database)`);
+  }
 }

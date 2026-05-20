@@ -6,6 +6,11 @@ test("open template in editor and export", async ({ page }) => {
   await page.goto("/#/templates");
   await dismissCookieBanner(page);
 
+  await page.waitForResponse(
+    response => response.url().includes("/api/templates") && response.ok(),
+  );
+  await expect(page.getByTestId("card-template-1")).toBeVisible({ timeout: 30000 });
+
   await page.getByTestId("card-template-1").click();
   await page.getByTestId("button-use-template-1").click();
 
