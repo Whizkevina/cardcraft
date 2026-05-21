@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { trackFeatureEvent } from "@/hooks/useTelemetry";
 import { useAuth } from "./AuthProvider";
 import { apiRequest } from "@/lib/queryClient";
 import { applySvgTextMode, type SvgTextMode } from "@/lib/svgTextExport";
@@ -250,6 +251,12 @@ export function SharePanel({ fabricRef, projectTitle, projectId, onQROpen, svgTe
         const url = `${appBase}/share/${data.shareToken}`;
         await navigator.clipboard.writeText(url);
         toast({ title: "Link copied!", description: "Anyone with this link can view your card." });
+        trackFeatureEvent("share_create", {
+          pagePath: "/editor",
+          action: "enable_share",
+          resourceType: "project",
+          resourceId: projectId,
+        }).catch(() => {});
         return;
       } catch {
         toast({ title: "Copy failed", variant: "destructive" });

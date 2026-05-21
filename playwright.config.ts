@@ -2,7 +2,9 @@ import { defineConfig, devices } from "@playwright/test";
 import dotenv from "dotenv";
 import path from "path";
 
-dotenv.config({ path: path.resolve(".env.test") });
+if (!process.env.CI) {
+  dotenv.config({ path: path.resolve(".env.test"), quiet: true });
+}
 
 const port = process.env.PORT || "5000";
 const baseURL = process.env.E2E_BASE_URL || `http://127.0.0.1:${port}`;

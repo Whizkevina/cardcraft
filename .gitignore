@@ -34,6 +34,10 @@ pids
 *.pid
 *.seed
 
+# MaxMind GeoLite2 (download at build on Render — see script/download-geoip.sh)
+GeoLite2-Country.mmdb
+*.mmdb
+
 # Test artifacts
 test-results/
 playwright-report/

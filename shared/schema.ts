@@ -15,6 +15,12 @@ export const users = pgTable("users", {
   lastDownloadDate: text("last_download_date"),
   resetToken: text("reset_token"),
   resetTokenExpiry: text("reset_token_expiry"),
+  authProvider: text("auth_provider").notNull().default("email"),
+  status: text("status").notNull().default("active"),
+  lastLoginAt: timestamp("last_login_at"),
+  totalDownloads: integer("total_downloads").notNull().default(0),
+  proExpiresAt: timestamp("pro_expires_at"),
+  adminNote: text("admin_note"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -70,6 +76,7 @@ export const payments = pgTable("payments", {
   status: text("status", { enum: ["pending", "success", "failed"] }).notNull().default("pending"),
   plan: text("plan").notNull().default("pro_lifetime"),
   paystackData: text("paystack_data"),
+  refundNote: text("refund_note"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -80,15 +87,70 @@ export type Payment = typeof payments.$inferSelect;
 // ─── Admin audit log ──────────────────────────────────────────────────────────
 export const adminAuditLog = pgTable("admin_audit_log", {
   id: serial("id").primaryKey(),
-  actorId: integer("actor_id").notNull(),
+  actorId: integer("actor_id"),
+  actorRole: text("actor_role").notNull().default("user"),
+  actorEmail: text("actor_email"),
+  actorName: text("actor_name"),
   action: text("action").notNull(),
   targetType: text("target_type").notNull(),
   targetId: integer("target_id"),
   meta: text("meta"),
+  ipAddress: text("ip_address"),
+  ipHash: text("ip_hash"),
+  sessionId: text("session_id"),
+  userAgent: text("user_agent"),
+  severity: text("severity").notNull().default("info"),
+  pagePath: text("page_path"),
+  referrer: text("referrer"),
+  beforeValue: text("before_value"),
+  afterValue: text("after_value"),
+  integrityHash: text("integrity_hash"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 export type AdminAuditLog = typeof adminAuditLog.$inferSelect;
+
+export const analyticsSessions = pgTable("analytics_sessions", {
+  id: serial("id").primaryKey(),
+  sessionKey: text("session_key").notNull(),
+  userId: integer("user_id").notNull(),
+  userName: text("user_name"),
+  userEmail: text("user_email"),
+  userRole: text("user_role"),
+  userTier: text("user_tier"),
+  pagePath: text("page_path"),
+  referrer: text("referrer"),
+  utmSource: text("utm_source"),
+  utmCampaign: text("utm_campaign"),
+  browser: text("browser"),
+  os: text("os"),
+  deviceType: text("device_type"),
+  country: text("country"),
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  lastSeenAt: timestamp("last_seen_at").notNull().defaultNow(),
+});
+
+export type AnalyticsSession = typeof analyticsSessions.$inferSelect;
+
+export const analyticsEvents = pgTable("analytics_events", {
+  id: serial("id").primaryKey(),
+  sessionKey: text("session_key"),
+  userId: integer("user_id"),
+  eventType: text("event_type").notNull(),
+  pagePath: text("page_path"),
+  action: text("action"),
+  resourceType: text("resource_type"),
+  resourceId: integer("resource_id"),
+  meta: text("meta"),
+  browser: text("browser"),
+  os: text("os"),
+  deviceType: text("device_type"),
+  referrer: text("referrer"),
+  ipHash: text("ip_hash"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type AnalyticsEvent = typeof analyticsEvents.$inferSelect;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 export const FREE_DOWNLOAD_LIMIT = 3;

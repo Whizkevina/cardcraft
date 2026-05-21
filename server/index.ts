@@ -11,6 +11,7 @@ import { createServer } from "http";
 import helmet from "helmet";
 import cors from "cors";
 import { validateProductionEnv, warnDevPlaceholders } from "./env";
+import { recordServerError } from "./metrics";
 
 validateProductionEnv();
 warnDevPlaceholders();
@@ -107,6 +108,8 @@ app.use((req, res, next) => {
       : (err.message || "Internal Server Error");
 
     if (!isProd) console.error("Error:", err);
+
+    if (status >= 500) recordServerError();
 
     if (res.headersSent) return next(err);
     return res.status(status).json({ message });

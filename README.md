@@ -170,10 +170,21 @@ Railway supports Node.js + PostgreSQL — add a Postgres plugin and set `DATABAS
 
 1. Push to GitHub
 2. Go to [render.com](https://render.com) → New Web Service → Connect repo
-3. **Build command:** `npm install && npm run build`
+3. **Build command:** `npm install && npm run geoip:download && npm run build`
 4. **Start command:** `NODE_ENV=production node dist/index.cjs`
-5. Set environment variables under Environment tab
+5. Set environment variables under **Environment** (see GeoIP below)
 6. Free tier available (spins down after inactivity)
+
+**GeoIP on Render** (optional — country codes in admin analytics):
+
+| Variable | Value | Notes |
+|----------|--------|--------|
+| `MAXMIND_LICENSE_KEY` | Your MaxMind license key | Mark as **Secret** |
+| `GEOIP_DB_PATH` | `./GeoLite2-Country.mmdb` | Same path the build script writes |
+
+The build step `npm run geoip:download` fetches GeoLite2-Country from MaxMind using your license key and saves it before `npm run build`. On startup, logs should show `[geoip] GeoLite2 Country database loaded`.
+
+Locally, place `GeoLite2-Country.mmdb` in the project root (or set `GEOIP_DB_PATH`); the download script skips if the file already exists.
 
 > **Node version:** The repo includes `.node-version` (Node 22 LTS). Render should pick this automatically — avoid Node 26, which breaks native dev tools used at build time.
 

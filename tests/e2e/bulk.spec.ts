@@ -16,10 +16,7 @@ test("bulk generation loads CSV and generates cards", async ({ page }) => {
   await page.reload();
   await page.goto("/#/bulk");
   await dismissCookieBanner(page);
-
-  await page.waitForResponse(
-    response => response.url().includes("/api/templates") && response.ok(),
-  );
+  await expect(page.getByTestId("select-template")).toBeVisible({ timeout: 30000 });
 
   await page.getByTestId("select-template").click();
   const templateOption = page.getByRole("option").first();

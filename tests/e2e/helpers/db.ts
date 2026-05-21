@@ -11,7 +11,7 @@ export const resetDatabase = async () => {
   const client = new Client({ connectionString: ensureDbUrl() });
   await client.connect();
   await client.query(
-    'TRUNCATE TABLE "session", admin_audit_log, payments, projects, templates, users RESTART IDENTITY CASCADE'
+    'TRUNCATE TABLE "session", analytics_events, analytics_sessions, admin_audit_log, payments, projects, templates, users, system_meta RESTART IDENTITY CASCADE'
   );
   await client.end();
 };

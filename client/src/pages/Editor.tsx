@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
+import { trackFeatureEvent } from "@/hooks/useTelemetry";
 import { applySvgTextMode, type SvgTextMode } from "@/lib/svgTextExport";
 import {
   ArrowLeft, Download, Save, Upload, Type, Palette, Layers,
@@ -934,6 +935,14 @@ export default function Editor() {
       : `${exportPreset.label} exported as ${format.toUpperCase()}.`;
 
     toast({ title: "Downloaded!", description: remaining });
+
+    trackFeatureEvent("download", {
+      pagePath: "/editor",
+      action: `export_${format}`,
+      resourceType: "project",
+      resourceId: projectId ?? undefined,
+      meta: { preset: exportPreset.label, format },
+    }).catch(() => {});
   };
 
   // ─── Layers list ──────────────────────────────────────────────────────────

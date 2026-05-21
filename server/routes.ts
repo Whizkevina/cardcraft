@@ -11,9 +11,14 @@ import crypto from "crypto";
 import rateLimit from "express-rate-limit";
 import validator from "validator";
 import { FREE_DOWNLOAD_LIMIT, FREE_PROJECT_LIMIT, PRO_PRICE_KOBO, PRO_PRICE_NGN } from "@shared/schema";
+import { getServerErrors24h } from "./metrics";
 import { getPaystackPublic, getPaystackSecret, getSessionSecret } from "./env";
 import { buildPricingQuote } from "./pricing";
 import { registerSharePublicRoutes } from "./sharePublic";
+import { extractClientIp, hashIp, parseUserAgent } from "./auditUtils";
+import { getAnalyticsDashboard, getAnalyticsLiveFeed, runRetentionCleanup } from "./analyticsService";
+import { initGeoIp, lookupCountry } from "./geoip";
+import { hasPermission, requireStaffRole, type Permission } from "./permissions";
 
 declare module "express-session" {
   interface SessionData {
@@ -23,6 +28,8 @@ declare module "express-session" {
     mustChangePassword?: boolean;
     guestDownloadsToday?: number;
     guestDownloadDate?: string;
+    impersonatingUserId?: number;
+    impersonatingUserName?: string;
   }
 }
 
@@ -86,11 +93,17 @@ const safeUser = (u: any) => ({
   downloadsToday: u.downloadsToday || 0,
   lastDownloadDate: u.lastDownloadDate,
   createdAt: u.createdAt,
+  status: u.status || "active",
   // NEVER include: password, resetToken, resetTokenExpiry
 });
 
 const safeAdminUser = (u: any, stats?: { projectCount: number; sharedCount: number }) => ({
   ...safeUser(u),
+  authProvider: u.authProvider || "email",
+  lastLoginAt: u.lastLoginAt,
+  totalDownloads: u.totalDownloads ?? 0,
+  proExpiresAt: u.proExpiresAt,
+  adminNote: u.adminNote ?? null,
   projectCount: stats?.projectCount ?? 0,
   sharedCount: stats?.sharedCount ?? 0,
 });
@@ -105,12 +118,98 @@ const safePayment = (p: any) => ({
   currency: p.currency,
   status: p.status,
   plan: p.plan,
+  refundNote: p.refundNote,
   createdAt: p.createdAt,
 });
 
+async function sendPasswordResetForEmail(email: string): Promise<boolean> {
+  const normalEmail = validator.normalizeEmail(email) || email.toLowerCase().trim();
+  const token = generateToken();
+  const expiry = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  const found = await storage.setResetToken(normalEmail, token, expiry);
+  if (!found || !process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) return !!found;
+  const appUrl = process.env.APP_URL || "http://localhost:5000";
+  const resetUrl = `${appUrl}/#/reset-password?token=${token}`;
+  try {
+    await createTransporter().sendMail({
+      from: `"CardCraft" <${process.env.GMAIL_USER}>`,
+      to: normalEmail,
+      subject: "Reset your CardCraft password",
+      html: `<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;background:#f9f9f7;padding:32px;border-radius:12px;"><h2 style="color:#1a1a1a">Reset your password</h2><p style="color:#555">Click below to set a new password. This link expires in 1 hour.</p><a href="${escapeHtml(resetUrl)}" style="display:inline-block;background:#c9a84c;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;margin:16px 0;">Reset Password</a><p style="color:#999;font-size:12px;">If you didn't request this, you can safely ignore this email.</p></div>`,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function establishSession(req: any, user: any) {
+  const active = await storage.enforceProExpiry(user);
+  req.session.userId = active.id;
+  req.session.userRole = active.role;
+  req.session.userTier = active.tier;
+  await storage.touchLastLogin(active.id);
+  return active;
+}
+
+async function logAudit(
+  req: any,
+  action: string,
+  targetType: string,
+  targetId: number | null,
+  meta?: Record<string, unknown>,
+  actorOverride?: { id?: number | null; role?: string; email?: string | null; name?: string | null },
+) {
+  try {
+    const actorId = actorOverride?.id !== undefined ? actorOverride.id : (req.session?.userId ?? null);
+    let role = actorOverride?.role;
+    let email = actorOverride?.email ?? null;
+    let name = actorOverride?.name ?? null;
+    if (!role && actorId) {
+      const u = await storage.getUser(actorId);
+      if (u) {
+        role = u.role;
+        email = email ?? u.email;
+        name = name ?? u.name;
+      }
+    }
+    const ip = extractClientIp(req);
+    const userAgent = typeof req.headers?.["user-agent"] === "string" ? req.headers["user-agent"] : null;
+    const pagePath = typeof meta?.pagePath === "string" ? meta.pagePath : (typeof req.headers?.["x-page-path"] === "string" ? req.headers["x-page-path"] : null);
+    const referrer = typeof req.headers?.referer === "string" ? req.headers.referer : null;
+    const beforeValue = meta?.from != null ? String(meta.from) : (meta?.before != null ? String(meta.before) : null);
+    const afterValue = meta?.to != null ? String(meta.to) : (meta?.after != null ? String(meta.after) : null);
+    await storage.logAuditEvent({
+      actorId,
+      actorRole: role ?? (actorId ? "user" : "guest"),
+      actorEmail: email ?? (typeof meta?.email === "string" ? meta.email : null),
+      actorName: name,
+      action,
+      targetType,
+      targetId,
+      meta,
+      ipAddress: ip || null,
+      sessionId: req.sessionID ?? null,
+      userAgent,
+      pagePath,
+      referrer,
+      beforeValue,
+      afterValue,
+    });
+  } catch (e) {
+    console.error("[audit]", e);
+  }
+}
+
 async function logAdmin(req: any, action: string, targetType: string, targetId: number | null, meta?: Record<string, unknown>) {
-  if (!req.session.userId) return;
-  await storage.logAdminAction(req.session.userId, action, targetType, targetId, meta);
+  await logAudit(req, action, targetType, targetId, meta);
+}
+
+function parseAuditRow(l: { meta: string | null; [key: string]: unknown }) {
+  return {
+    ...l,
+    meta: l.meta ? (() => { try { return JSON.parse(l.meta as string); } catch { return l.meta; } })() : null,
+  };
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -234,14 +333,54 @@ const apiLimiter = rateLimit({
 });
 
 // ─── Middleware helpers ───────────────────────────────────────────────────────
-const requireAuth = (req: any, res: any, next: any) => {
+const requireAuth = async (req: any, res: any, next: any) => {
   if (!req.session.userId) return res.status(401).json({ error: "Unauthorized" });
+  const user = await storage.getUser(req.session.userId);
+  if (!user) {
+    req.session.destroy(() => {});
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  if (user.status === "suspended") return res.status(403).json({ error: "Account suspended" });
+  const active = await storage.enforceProExpiry(user);
+  if (active.tier !== user.tier) {
+    req.session.userTier = active.tier;
+  }
+  req.currentUser = active;
   next();
 };
 const requireAdmin = (req: any, res: any, next: any) => {
   if (req.session.userRole !== "admin") return res.status(403).json({ error: "Forbidden" });
   next();
 };
+
+const requireStaff = (req: any, res: any, next: any) => {
+  if (!requireStaffRole(req.session.userRole ?? "")) return res.status(403).json({ error: "Forbidden" });
+  next();
+};
+
+const requirePermission = (permission: Permission) => (req: any, res: any, next: any) => {
+  if (!hasPermission(req.session.userRole ?? "", permission)) return res.status(403).json({ error: "Forbidden" });
+  next();
+};
+
+function getEffectiveUserId(req: any): number {
+  if (req.session.impersonatingUserId && hasPermission(req.session.userRole ?? "", "users:impersonate")) {
+    return req.session.impersonatingUserId;
+  }
+  return req.session.userId!;
+}
+
+function isImpersonating(req: any): boolean {
+  return Boolean(req.session.impersonatingUserId && hasPermission(req.session.userRole ?? "", "users:impersonate"));
+}
+
+function blockIfImpersonating(req: any, res: any): boolean {
+  if (isImpersonating(req)) {
+    res.status(403).json({ error: "Read-only view mode — exit support view to make changes" });
+    return true;
+  }
+  return false;
+}
 
 const isLocalRequest = (req: any) => {
   const ip = String(req.ip || "").replace("::ffff:", "");
@@ -252,6 +391,8 @@ const isLocalRequest = (req: any) => {
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
   // Initialize database
   await initDb();
+  await initGeoIp();
+  runRetentionCleanup().catch(e => console.error("[retention]", e));
 
   // Public share pages for crawlers (OG tags) — before SPA catch-all
   registerSharePublicRoutes(app);
@@ -305,13 +446,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const existingUser = await storage.getUserByEmail(normalEmail);
       if (existingUser) return res.status(400).json({ error: "Email already registered" });
       const hashed = await bcrypt.hash(password, 12);
-      const user = await storage.createUser({ name: name.trim(), email: normalEmail, password: hashed, role: "user", tier: "free" });
-      req.session.userId = user.id;
-      req.session.userRole = user.role;
-      req.session.userTier = user.tier;
+      const user = await storage.createUser({ name: name.trim(), email: normalEmail, password: hashed, role: "user", tier: "free", authProvider: "email" });
+      await establishSession(req, user);
       req.session.mustChangePassword = false;
       // Send welcome email asynchronously — do NOT await so it never delays the response
       sendWelcomeEmail(user.name, user.email);
+      await logAudit(req, "user.register", "user", user.id, { authProvider: "email" }, { id: user.id, role: user.role, email: user.email, name: user.name });
       res.status(201).json({ user: safeUser(user) });
     } catch (e: any) { res.status(500).json({ error: "Registration failed" }); }
   });
@@ -344,6 +484,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       let user = await storage.getUserByEmail(normalEmail);
 
       // Register new user seamlessly if they don't exist
+      const isNewUser = !user;
       if (!user) {
         const name = payload.name || "Google User";
         // Create an uncrackable random placeholder password for OAuth users
@@ -353,15 +494,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           email: normalEmail,
           password: dummyHash,
           role: "user",
-          tier: "free"
+          tier: "free",
+          authProvider: "google",
         });
+      } else if (user.authProvider !== "google") {
+        await storage.updateUserAuthProvider(user.id, "google");
       }
 
-      // Automatically create a session
-      req.session.userId = user.id;
-      req.session.userRole = user.role;
-      req.session.userTier = user.tier;
+      await establishSession(req, user);
       req.session.mustChangePassword = false;
+
+      if (isNewUser) {
+        await logAudit(req, "user.register", "user", user.id, { authProvider: "google" }, { id: user.id, role: user.role, email: user.email, name: user.name });
+      }
+      await logAudit(req, "user.login", "user", user.id, { method: "google" }, { id: user.id, role: user.role, email: user.email, name: user.name });
 
       res.status(200).json({ user: safeUser(user) });
     } catch (e: any) {
@@ -380,21 +526,25 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // Constant-time comparison even on miss — prevents timing attacks
       const dummyHash = "$2a$12$invalidhashfortimingequalityXXXXXXXXXXXXXXXXXXXXXX";
       const valid = user ? await bcrypt.compare(password, user.password) : await bcrypt.compare(password, dummyHash);
-      if (!user || !valid) return res.status(401).json({ error: "Invalid credentials" });
-      req.session.userId = user.id;
-      req.session.userRole = user.role;
-      req.session.userTier = user.tier;
+      if (!user || !valid) {
+        await logAudit(req, "user.login_failed", "user", null, { email: normalEmail, reason: user ? "invalid_password" : "unknown_email" });
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+      if (user.status === "suspended") return res.status(403).json({ error: "Account suspended" });
+      await establishSession(req, user);
       req.session.mustChangePassword = false;
       // Flag admin logging in with default password so frontend can prompt change
       const isDefaultAdminPassword = user.role === "admin" && await bcrypt.compare("admin123", user.password);
       req.session.mustChangePassword = isDefaultAdminPassword;
       const userObj = safeUser(user) as any;
       if (isDefaultAdminPassword) userObj.needsPasswordChange = true;
+      await logAudit(req, "user.login", "user", user.id, { method: "email" }, { id: user.id, role: user.role, email: user.email, name: user.name });
       res.json({ user: userObj });
     } catch (e: any) { res.status(500).json({ error: "Login failed" }); }
   });
 
-  app.post("/api/auth/logout", requireAuth, (req, res) => {
+  app.post("/api/auth/logout", requireAuth, async (req, res) => {
+    await logAudit(req, "user.logout", "user", req.session.userId!);
     req.session.destroy((err) => {
       if (err) return res.status(500).json({ error: "Logout failed" });
       res.clearCookie("connect.sid");
@@ -404,12 +554,21 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.get("/api/auth/me", async (req, res) => {
     if (!req.session.userId) return res.json({ user: null });
-    const user = await storage.getUser(req.session.userId);
+    let user = await storage.getUser(req.session.userId);
     if (!user) { req.session.destroy(() => {}); return res.json({ user: null }); }
+    if (user.status === "suspended") return res.json({ user: null });
+    user = await storage.enforceProExpiry(user);
     req.session.userTier = user.tier;
     const userObj = safeUser(user) as any;
     if (req.session.mustChangePassword) userObj.needsPasswordChange = true;
-    res.json({ user: userObj });
+    const payload: Record<string, unknown> = { user: userObj };
+    if (req.session.impersonatingUserId) {
+      payload.impersonating = {
+        userId: req.session.impersonatingUserId,
+        userName: req.session.impersonatingUserName ?? null,
+      };
+    }
+    res.json(payload);
   });
 
   // ─── Change password ────────────────────────────────────────────────────────
@@ -424,30 +583,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const hashed = await bcrypt.hash(newPassword, 12);
     await storage.updateUserPassword(req.session.userId!, hashed);
     req.session.mustChangePassword = false;
+    await logAudit(req, "user.password_change", "user", req.session.userId!);
     res.json({ ok: true });
   });
 
   // ─── Forgot password ────────────────────────────────────────────────────────
   app.post("/api/auth/forgot-password", forgotPasswordLimiter, async (req, res) => {
     const { email } = req.body;
-    // Always respond 200 to prevent user enumeration
     if (!email || !validateEmail(email)) return res.json({ ok: true });
     const normalEmail = validator.normalizeEmail(email) || email.toLowerCase().trim();
-    const token = generateToken();
-    const expiry = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-    const found = await storage.setResetToken(normalEmail, token, expiry);
-    if (found && process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
-      const appUrl = process.env.APP_URL || "http://localhost:5000";
-      const resetUrl = `${appUrl}/#/reset-password?token=${token}`;
-      try {
-        await createTransporter().sendMail({
-          from: `"CardCraft" <${process.env.GMAIL_USER}>`,
-          to: normalEmail,
-          subject: "Reset your CardCraft password",
-          html: `<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;background:#f9f9f7;padding:32px;border-radius:12px;"><h2 style="color:#1a1a1a">Reset your password</h2><p style="color:#555">Click below to set a new password. This link expires in 1 hour.</p><a href="${escapeHtml(resetUrl)}" style="display:inline-block;background:#c9a84c;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;margin:16px 0;">Reset Password</a><p style="color:#999;font-size:12px;">If you didn't request this, you can safely ignore this email.</p></div>`,
-        });
-      } catch (e) { /* fail silently — don't leak whether email exists */ }
-    }
+    await sendPasswordResetForEmail(normalEmail);
+    await logAudit(req, "user.password_reset_request", "user", null, { email: normalEmail });
     res.json({ ok: true, message: "If that email is registered, you'll receive a reset link shortly." });
   });
 
@@ -465,6 +611,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const hashed = await bcrypt.hash(newPassword, 12);
     await storage.updateUserPassword(user.id, hashed);
     await storage.clearResetToken(user.id);
+    await logAudit(req, "user.password_reset", "user", user.id, { email: user.email }, { id: user.id, role: user.role, email: user.email, name: user.name });
     res.json({ ok: true, message: "Password updated. You can now sign in." });
   });
 
@@ -473,7 +620,62 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const { theme } = req.body;
     if (!["dark", "light"].includes(theme)) return res.status(400).json({ error: "Invalid theme" });
     await storage.updateUserTheme(req.session.userId!, theme);
+    await logAudit(req, "user.theme_change", "user", req.session.userId!, { theme });
     res.json({ theme });
+  });
+
+  const telemetryLimiter = rateLimit({ windowMs: 60_000, max: 120, standardHeaders: true, legacyHeaders: false });
+
+  app.post("/api/telemetry/heartbeat", telemetryLimiter, requireAuth, async (req, res) => {
+    const user = await storage.getUser(req.session.userId!);
+    if (!user) return res.status(401).json({ error: "Unauthorized" });
+    const { pagePath, referrer, utmSource, utmCampaign, browser, os, deviceType } = req.body ?? {};
+    const sessionKey = req.sessionID ? crypto.createHash("sha256").update(req.sessionID).digest("hex").slice(0, 32) : `u${user.id}`;
+    const ip = extractClientIp(req);
+    const country = lookupCountry(ip);
+    await storage.upsertAnalyticsSession({
+      sessionKey,
+      userId: user.id,
+      userName: user.name,
+      userEmail: user.email,
+      userRole: user.role,
+      userTier: user.tier,
+      pagePath: typeof pagePath === "string" ? pagePath.slice(0, 256) : undefined,
+      referrer: typeof referrer === "string" ? referrer.slice(0, 512) : undefined,
+      utmSource: typeof utmSource === "string" ? utmSource.slice(0, 128) : undefined,
+      utmCampaign: typeof utmCampaign === "string" ? utmCampaign.slice(0, 128) : undefined,
+      browser: typeof browser === "string" ? browser.slice(0, 64) : undefined,
+      os: typeof os === "string" ? os.slice(0, 64) : undefined,
+      deviceType: typeof deviceType === "string" ? deviceType.slice(0, 32) : undefined,
+      country,
+    });
+    res.json({ ok: true });
+  });
+
+  app.post("/api/telemetry/event", telemetryLimiter, requireAuth, async (req, res) => {
+    const userId = req.session.userId!;
+    const { eventType, pagePath, action, resourceType, resourceId, meta, browser, os, deviceType, referrer } = req.body ?? {};
+    if (!eventType || typeof eventType !== "string") return res.status(400).json({ error: "eventType required" });
+    const allowed = ["page_view", "feature_click", "conversion", "download", "share_create", "bulk_generate", "bulk_download"];
+    if (!allowed.includes(eventType)) return res.status(400).json({ error: "Invalid eventType" });
+    const sessionKey = req.sessionID ? crypto.createHash("sha256").update(req.sessionID).digest("hex").slice(0, 32) : `u${userId}`;
+    const ip = extractClientIp(req);
+    await storage.recordAnalyticsEvent({
+      sessionKey,
+      userId,
+      eventType,
+      pagePath: typeof pagePath === "string" ? pagePath : undefined,
+      action: typeof action === "string" ? action : undefined,
+      resourceType: typeof resourceType === "string" ? resourceType : undefined,
+      resourceId: Number.isInteger(resourceId) ? resourceId : null,
+      meta: meta && typeof meta === "object" ? meta : undefined,
+      browser: typeof browser === "string" ? browser : undefined,
+      os: typeof os === "string" ? os : undefined,
+      deviceType: typeof deviceType === "string" ? deviceType : undefined,
+      referrer: typeof referrer === "string" ? referrer : undefined,
+      ipHash: hashIp(ip),
+    });
+    res.json({ ok: true });
   });
 
   // ─── Downloads ──────────────────────────────────────────────────────────────
@@ -492,10 +694,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.post("/api/downloads/track", async (req, res) => {
     if (!req.session.userId) {
       const result = trackGuestDownload(req);
+      if (result.allowed) {
+        await logAudit(req, "user.download", "session", null, { downloadsToday: result.downloadsToday, tier: "guest" });
+      }
       return res.json({ allowed: result.allowed, tier: "guest", downloadsToday: result.downloadsToday, limit: FREE_DOWNLOAD_LIMIT });
     }
     const result = await storage.trackDownload(req.session.userId);
     const user = await storage.getUser(req.session.userId);
+    if (result.allowed) {
+      await logAudit(req, "user.download", "user", req.session.userId, { downloadsToday: result.downloadsToday, tier: user?.tier ?? "free" });
+    }
     res.json({ allowed: result.allowed, tier: user?.tier || "free", downloadsToday: result.downloadsToday, limit: FREE_DOWNLOAD_LIMIT });
   });
 
@@ -549,17 +757,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(t);
   });
 
-  app.post("/api/templates", requireAuth, requireAdmin, async (req, res) => {
+  app.post("/api/templates", requireAuth, requireStaff, requirePermission("templates:write"), async (req, res) => {
     try {
       const clean = sanitiseTemplateBody(req.body);
       if (!clean.title?.trim() || !clean.canvasJson) return res.status(400).json({ error: "title and canvasJson required" });
       // Validate canvasJson is valid JSON
       try { JSON.parse(clean.canvasJson); } catch { return res.status(400).json({ error: "canvasJson must be valid JSON" }); }
-      res.status(201).json(await storage.createTemplate(clean));
+      const t = await storage.createTemplate(clean);
+      await logAdmin(req, "template.create", "template", t.id, { title: t.title, category: t.category });
+      res.status(201).json(t);
     } catch (e: any) { res.status(400).json({ error: "Failed to create template" }); }
   });
 
-  app.patch("/api/templates/:id", requireAuth, requireAdmin, async (req, res) => {
+  app.patch("/api/templates/:id", requireAuth, requireStaff, requirePermission("templates:write"), async (req, res) => {
     const id = safeId(req.params.id);
     if (!id) return res.status(400).json({ error: "Invalid ID" });
     const before = await storage.getTemplate(id);
@@ -572,7 +782,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(t);
   });
 
-  app.delete("/api/templates/:id", requireAuth, requireAdmin, async (req, res) => {
+  app.delete("/api/templates/:id", requireAuth, requireStaff, requirePermission("templates:write"), async (req, res) => {
     const id = safeId(req.params.id);
     if (!id) return res.status(400).json({ error: "Invalid ID" });
     const before = await storage.getTemplate(id);
@@ -583,7 +793,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   // ─── Projects ───────────────────────────────────────────────────────────────
   app.get("/api/projects", requireAuth, async (req, res) => {
-    res.json(await storage.getProjectsByUser(req.session.userId!));
+    const userId = getEffectiveUserId(req);
+    res.json(await storage.getProjectsByUser(userId));
   });
 
   app.get("/api/projects/:id", requireAuth, async (req, res) => {
@@ -591,11 +802,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (!id) return res.status(400).json({ error: "Invalid ID" });
     const p = await storage.getProject(id);
     if (!p) return res.status(404).json({ error: "Not found" });
-    if (p.userId !== req.session.userId && req.session.userRole !== "admin") return res.status(403).json({ error: "Forbidden" });
+    const userId = getEffectiveUserId(req);
+    const isStaff = requireStaffRole(req.session.userRole ?? "");
+    if (p.userId !== userId && !isStaff) return res.status(403).json({ error: "Forbidden" });
     res.json(p);
   });
 
   app.post("/api/projects", requireAuth, async (req, res) => {
+    if (blockIfImpersonating(req, res)) return;
     try {
       const clean = sanitiseProjectBody(req.body);
       if (!clean.designJson) return res.status(400).json({ error: "designJson required" });
@@ -611,39 +825,49 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         }
       }
 
-      res.status(201).json(await storage.createProject({ ...clean, userId: req.session.userId! }));
+      const project = await storage.createProject({ ...clean, userId: req.session.userId! });
+      await logAudit(req, "project.create", "project", project.id, { title: project.title, templateId: project.templateId });
+      res.status(201).json(project);
     } catch (e: any) { res.status(400).json({ error: "Failed to create project" }); }
   });
 
   app.patch("/api/projects/:id", requireAuth, async (req, res) => {
+    if (blockIfImpersonating(req, res)) return;
     const id = safeId(req.params.id);
     if (!id) return res.status(400).json({ error: "Invalid ID" });
     const existing = await storage.getProject(id);
     if (!existing) return res.status(404).json({ error: "Not found" });
     if (existing.userId !== req.session.userId) return res.status(403).json({ error: "Forbidden" });
     const clean = sanitiseProjectBody(req.body);
-    res.json(await storage.updateProject(id, clean));
+    const updated = await storage.updateProject(id, clean);
+    await logAudit(req, "project.update", "project", id, { title: updated?.title ?? existing.title });
+    res.json(updated);
   });
 
   app.delete("/api/projects/:id", requireAuth, async (req, res) => {
+    if (blockIfImpersonating(req, res)) return;
     const id = safeId(req.params.id);
     if (!id) return res.status(400).json({ error: "Invalid ID" });
     const existing = await storage.getProject(id);
     if (!existing) return res.status(404).json({ error: "Not found" });
     if (existing.userId !== req.session.userId) return res.status(403).json({ error: "Forbidden" });
     await storage.deleteProject(id);
+    await logAudit(req, "project.delete", "project", id, { title: existing.title });
     res.json({ ok: true });
   });
 
   app.post("/api/projects/:id/duplicate", requireAuth, async (req, res) => {
+    if (blockIfImpersonating(req, res)) return;
     const id = safeId(req.params.id);
     if (!id) return res.status(400).json({ error: "Invalid ID" });
     const copy = await storage.duplicateProject(id, req.session.userId!);
     if (!copy) return res.status(404).json({ error: "Not found" });
+    await logAudit(req, "project.duplicate", "project", copy.id, { sourceId: id, title: copy.title });
     res.status(201).json(copy);
   });
 
   app.post("/api/projects/:id/enable-share", requireAuth, async (req, res) => {
+    if (blockIfImpersonating(req, res)) return;
     const id = safeId(req.params.id);
     if (!id) return res.status(400).json({ error: "Invalid ID" });
     const shareImage = parseShareImage(req.body?.shareImage);
@@ -652,6 +876,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
     const project = await storage.enableProjectShare(id, req.session.userId!, shareImage);
     if (!project) return res.status(404).json({ error: "Not found" });
+    await logAudit(req, "project.share_enable", "project", id, { title: project.title, shareToken: project.shareToken });
     res.json({
       shareToken: project.shareToken,
       shareEnabled: project.shareEnabled,
@@ -666,6 +891,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (!title) return res.status(400).json({ error: "Title required" });
     const p = await storage.renameProject(id, req.session.userId!, title);
     if (!p) return res.status(404).json({ error: "Not found" });
+    await logAudit(req, "project.rename", "project", id, { title });
     res.json(p);
   });
 
@@ -697,7 +923,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (user.tier === "pro") return res.status(400).json({ error: "Already on Pro plan" });
     try {
       const reference = generateRef();
-      await storage.createPayment({ userId: user.id, reference, amount: PRO_PRICE_KOBO, status: "pending", plan: "pro_lifetime" });
+      const payment = await storage.createPayment({ userId: user.id, reference, amount: PRO_PRICE_KOBO, status: "pending", plan: "pro_lifetime" });
+      await logAudit(req, "payment.initialize", "payment", payment.id, { reference, amount: PRO_PRICE_KOBO });
       const paystackRes = await paystackRequest("POST", "/transaction/initialize", {
         email: user.email, amount: PRO_PRICE_KOBO, reference, currency: "NGN",
         metadata: { userId: user.id, plan: "pro_lifetime" },
@@ -729,8 +956,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         await storage.updatePaymentStatus(reference, "success");
         await storage.updateUserTier(payment.userId, "pro");
         req.session.userTier = "pro";
+        await logAudit(req, "payment.success", "payment", payment.id, { reference, amount: payment.amount });
         return res.json({ success: true, tier: "pro" });
       }
+      await logAudit(req, "payment.pending", "payment", payment.id, { reference, status: paystackRes.data?.status });
       res.json({ success: false, message: "Payment not complete yet" });
     } catch (e: any) { res.status(500).json({ error: "Verification failed" }); }
   });
@@ -756,8 +985,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         if (payment && payment.status !== "success") {
           await storage.updatePaymentStatus(ref, "success");
           await storage.updateUserTier(payment.userId, "pro");
+          await logAudit(req, "payment.success", "payment", payment.id, { reference: ref, source: "webhook" }, { id: null, role: "system", name: "Paystack Webhook" });
         }
       }
+      await storage.setSystemMeta("paystack_webhook_last", JSON.stringify({ status: "success", event: event.event, at: new Date().toISOString() }));
+    } else {
+      await storage.setSystemMeta("paystack_webhook_last", JSON.stringify({ status: "received", event: event?.event ?? "unknown", at: new Date().toISOString() }));
     }
     res.sendStatus(200);
   });
@@ -790,6 +1023,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
     if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
       console.log(`[SIMULATED EMAIL] To: ${safeTo}, Subject: ${safeSubject}, ImageBase64Length: ${imageDataUrl.length}`);
+      await logAudit(req, "email.send_card", "project", null, { to: safeTo, cardTitle: safeTitle, simulated: true });
       return res.status(200).json({ 
         success: true, 
         message: `[Simulated] Sent to ${safeTo}. Add GMAIL_USER in .env to send real emails.` 
@@ -810,6 +1044,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         attachments: [{ filename, content: imageBuffer, cid: "cardimage" }],
       });
       res.json({ success: true, message: `Card sent to ${safeTo}` });
+      await logAudit(req, "email.send_card", "project", null, { to: safeTo, cardTitle: safeTitle });
     } catch (e: any) { res.status(500).json({ error: "Failed to send email" }); }
   });
 
@@ -819,16 +1054,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // ─── Admin ───────────────────────────────────────────────────────────────────
-  app.get("/api/admin/analytics", requireAuth, requireAdmin, async (req, res) => {
+  app.get("/api/admin/analytics", requireAuth, requireStaff, requirePermission("analytics:read"), async (req, res) => {
     res.json(await storage.getAnalytics());
   });
 
-  app.get("/api/admin/users", requireAuth, requireAdmin, async (req, res) => {
+  app.get("/api/admin/users", requireAuth, requireStaff, requirePermission("users:read"), async (req, res) => {
     const [users, statsMap] = await Promise.all([storage.getAllUsers(), storage.getProjectStatsByUser()]);
     res.json(users.map(u => safeAdminUser(u, statsMap[u.id])));
   });
 
-  app.get("/api/admin/users/:id", requireAuth, requireAdmin, async (req, res) => {
+  app.get("/api/admin/users/:id", requireAuth, requireStaff, requirePermission("users:read"), async (req, res) => {
     const id = safeId(req.params.id);
     if (!id) return res.status(400).json({ error: "Invalid ID" });
     const detail = await storage.getAdminUserDetail(id);
@@ -839,29 +1074,38 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     });
   });
 
-  app.patch("/api/admin/users/:id/tier", requireAuth, requireAdmin, async (req, res) => {
+  app.patch("/api/admin/users/:id/tier", requireAuth, requireStaff, requirePermission("users:write"), async (req, res) => {
     const id = safeId(req.params.id);
     if (!id) return res.status(400).json({ error: "Invalid ID" });
-    const { tier, reason } = req.body;
+    const { tier, reason, proExpiresAt } = req.body;
     if (!["free", "pro"].includes(tier)) return res.status(400).json({ error: "Invalid tier" });
     const before = await storage.getUser(id);
     if (!before) return res.status(404).json({ error: "Not found" });
-    const user = await storage.updateUserTier(id, tier);
+    let expiry: Date | null | undefined;
+    if (tier === "pro" && proExpiresAt) {
+      const parsed = new Date(proExpiresAt);
+      if (Number.isNaN(parsed.getTime())) return res.status(400).json({ error: "Invalid pro expiry date" });
+      expiry = parsed;
+    } else if (tier === "free") {
+      expiry = null;
+    }
+    const user = await storage.updateUserTier(id, tier, expiry);
     if (!user) return res.status(404).json({ error: "Not found" });
     await logAdmin(req, "user.tier_change", "user", id, {
       from: before.tier,
       to: tier,
       email: before.email,
       reason: typeof reason === "string" ? reason.slice(0, 500) : undefined,
+      proExpiresAt: user.proExpiresAt,
     });
     res.json(safeAdminUser(user, (await storage.getProjectStatsByUser())[id]));
   });
 
-  app.patch("/api/admin/users/:id/role", requireAuth, requireAdmin, async (req, res) => {
+  app.patch("/api/admin/users/:id/role", requireAuth, requireStaff, requirePermission("users:role"), async (req, res) => {
     const id = safeId(req.params.id);
     if (!id) return res.status(400).json({ error: "Invalid ID" });
     const { role } = req.body;
-    if (!["user", "admin"].includes(role)) return res.status(400).json({ error: "Invalid role" });
+    if (!["user", "admin", "support", "content"].includes(role)) return res.status(400).json({ error: "Invalid role" });
     if (id === req.session.userId) return res.status(400).json({ error: "Cannot change your own role" });
     const before = await storage.getUser(id);
     if (!before) return res.status(404).json({ error: "Not found" });
@@ -871,22 +1115,243 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(safeAdminUser(user, (await storage.getProjectStatsByUser())[id]));
   });
 
-  app.get("/api/admin/payments", requireAuth, requireAdmin, async (req, res) => {
+  app.post("/api/admin/impersonate/:id", requireAuth, requireStaff, requirePermission("users:impersonate"), async (req, res) => {
+    const id = safeId(req.params.id);
+    if (!id) return res.status(400).json({ error: "Invalid ID" });
+    const target = await storage.getUser(id);
+    if (!target) return res.status(404).json({ error: "Not found" });
+    if (target.role === "admin") return res.status(403).json({ error: "Cannot view as another admin" });
+    req.session.impersonatingUserId = target.id;
+    req.session.impersonatingUserName = target.name;
+    await logAdmin(req, "user.impersonate_start", "user", id, { email: target.email, readOnly: true });
+    res.json({ userId: target.id, userName: target.name, userEmail: target.email });
+  });
+
+  app.delete("/api/admin/impersonate", requireAuth, requireStaff, requirePermission("users:impersonate"), async (req, res) => {
+    const id = req.session.impersonatingUserId;
+    if (id) await logAdmin(req, "user.impersonate_end", "user", id, {});
+    req.session.impersonatingUserId = undefined;
+    req.session.impersonatingUserName = undefined;
+    res.json({ ok: true });
+  });
+
+  app.get("/api/admin/payments", requireAuth, requireStaff, requirePermission("payments:read"), async (req, res) => {
     const status = typeof req.query.status === "string" ? req.query.status : undefined;
     const email = typeof req.query.email === "string" ? req.query.email : undefined;
+    const from = typeof req.query.from === "string" ? req.query.from : undefined;
+    const to = typeof req.query.to === "string" ? req.query.to : undefined;
     const [payments, revenueThisMonth] = await Promise.all([
-      storage.getAdminPayments({ status, email }),
+      storage.getAdminPayments({ status, email, from, to }),
       storage.getPaymentsRevenueThisMonth(),
     ]);
     res.json({ payments: payments.map(safePayment), revenueThisMonth });
   });
 
-  app.get("/api/admin/audit-log", requireAuth, requireAdmin, async (req, res) => {
-    const logs = await storage.getAuditLogs(100);
-    res.json(logs.map((l: { meta: string | null; [key: string]: unknown }) => ({
-      ...l,
-      meta: l.meta ? (() => { try { return JSON.parse(l.meta); } catch { return l.meta; } })() : null,
-    })));
+  app.patch("/api/admin/payments/:id/refund-note", requireAuth, requireStaff, requirePermission("payments:write"), async (req, res) => {
+    const id = safeId(req.params.id);
+    if (!id) return res.status(400).json({ error: "Invalid ID" });
+    const { refundNote } = req.body;
+    const note = typeof refundNote === "string" ? refundNote.slice(0, 500) : null;
+    const payment = await storage.updatePaymentRefundNote(id, note || null);
+    if (!payment) return res.status(404).json({ error: "Not found" });
+    await logAdmin(req, "payment.refund_note", "payment", id, { refundNote: note });
+    res.json(safePayment(payment));
+  });
+
+  app.post("/api/admin/users/:id/send-password-reset", requireAuth, requireStaff, requirePermission("users:write"), async (req, res) => {
+    const id = safeId(req.params.id);
+    if (!id) return res.status(400).json({ error: "Invalid ID" });
+    const user = await storage.getUser(id);
+    if (!user) return res.status(404).json({ error: "Not found" });
+    await sendPasswordResetForEmail(user.email);
+    await logAdmin(req, "user.password_reset_sent", "user", id, { email: user.email });
+    res.json({ ok: true, message: "Password reset email sent if SMTP is configured." });
+  });
+
+  app.post("/api/admin/users/:id/force-logout", requireAuth, requireStaff, requirePermission("users:write"), async (req, res) => {
+    const id = safeId(req.params.id);
+    if (!id) return res.status(400).json({ error: "Invalid ID" });
+    if (id === req.session.userId) return res.status(400).json({ error: "Cannot force-logout yourself" });
+    const user = await storage.getUser(id);
+    if (!user) return res.status(404).json({ error: "Not found" });
+    const count = await storage.destroyUserSessions(id);
+    await logAdmin(req, "user.force_logout", "user", id, { sessionsDestroyed: count, email: user.email });
+    res.json({ ok: true, sessionsDestroyed: count });
+  });
+
+  app.patch("/api/admin/users/:id/status", requireAuth, requireStaff, requirePermission("users:write"), async (req, res) => {
+    const id = safeId(req.params.id);
+    if (!id) return res.status(400).json({ error: "Invalid ID" });
+    if (id === req.session.userId) return res.status(400).json({ error: "Cannot suspend yourself" });
+    const { status } = req.body;
+    if (!["active", "suspended"].includes(status)) return res.status(400).json({ error: "Invalid status" });
+    const before = await storage.getUser(id);
+    if (!before) return res.status(404).json({ error: "Not found" });
+    const user = await storage.updateUserStatus(id, status);
+    if (!user) return res.status(404).json({ error: "Not found" });
+    if (status === "suspended") await storage.destroyUserSessions(id);
+    await logAdmin(req, "user.status_change", "user", id, { from: before.status, to: status, email: before.email });
+    res.json(safeAdminUser(user, (await storage.getProjectStatsByUser())[id]));
+  });
+
+  app.get("/api/admin/audit-log", requireAuth, requireStaff, requirePermission("audit:read"), async (req, res) => {
+    const search = typeof req.query.search === "string" ? req.query.search : undefined;
+    const action = typeof req.query.action === "string" ? req.query.action : undefined;
+    const actorRole = typeof req.query.actorRole === "string" ? req.query.actorRole : undefined;
+    const severity = typeof req.query.severity === "string" ? req.query.severity : undefined;
+    const from = typeof req.query.from === "string" ? req.query.from : undefined;
+    const to = typeof req.query.to === "string" ? req.query.to : undefined;
+    const ipSearch = typeof req.query.ip === "string" ? req.query.ip : undefined;
+    const limit = typeof req.query.limit === "string" ? parseInt(req.query.limit, 10) : 100;
+    const offset = typeof req.query.offset === "string" ? parseInt(req.query.offset, 10) : 0;
+    const ipHash = ipSearch ? hashIp(ipSearch) ?? undefined : undefined;
+    const filters = { search, action, actorRole, severity, from, to, ipHash, limit: Number.isFinite(limit) ? limit : 100, offset: Number.isFinite(offset) ? offset : 0 };
+    const [logs, total] = await Promise.all([
+      storage.getAuditLogs(filters),
+      storage.getAuditLogCount(filters),
+    ]);
+    res.json({ items: logs.map(parseAuditRow), total, limit: filters.limit, offset: filters.offset });
+  });
+
+  app.get("/api/admin/audit-log/export", requireAuth, requireStaff, requirePermission("audit:read"), async (req, res) => {
+    const format = req.query.format === "json" ? "json" : "csv";
+    const search = typeof req.query.search === "string" ? req.query.search : undefined;
+    const action = typeof req.query.action === "string" ? req.query.action : undefined;
+    const actorRole = typeof req.query.actorRole === "string" ? req.query.actorRole : undefined;
+    const severity = typeof req.query.severity === "string" ? req.query.severity : undefined;
+    const from = typeof req.query.from === "string" ? req.query.from : undefined;
+    const to = typeof req.query.to === "string" ? req.query.to : undefined;
+    const logs = await storage.getAuditLogs({ search, action, actorRole, severity, from, to, limit: 5000, offset: 0 });
+    const rows = logs.map(parseAuditRow);
+    if (format === "json") {
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Content-Disposition", `attachment; filename="audit-log-${Date.now()}.json"`);
+      return res.json(rows);
+    }
+    const headers = ["id", "createdAt", "action", "severity", "actorName", "actorEmail", "actorRole", "targetType", "targetId", "pagePath", "ipAddress", "sessionId"];
+    const csv = [headers.join(",")].concat(rows.map((r: Record<string, unknown>) => headers.map(h => {
+      const val = (r as Record<string, unknown>)[h];
+      const s = val == null ? "" : String(val).replace(/"/g, '""');
+      return `"${s}"`;
+    }).join(","))).join("\n");
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", `attachment; filename="audit-log-${Date.now()}.csv"`);
+    res.send(csv);
+  });
+
+  app.get("/api/admin/audit-log/:id", requireAuth, requireStaff, requirePermission("audit:read"), async (req, res) => {
+    const id = safeId(req.params.id);
+    if (!id) return res.status(400).json({ error: "Invalid ID" });
+    const entry = await storage.getAuditLogById(id);
+    if (!entry) return res.status(404).json({ error: "Not found" });
+    res.json(parseAuditRow(entry));
+  });
+
+  app.get("/api/admin/analytics/dashboard", requireAuth, requireStaff, requirePermission("analytics:read"), async (req, res) => {
+    const period = req.query.period === "30d" || req.query.period === "90d" ? req.query.period : "7d";
+    res.json(await getAnalyticsDashboard(period));
+  });
+
+  app.get("/api/admin/analytics/live", requireAuth, requireStaff, requirePermission("analytics:read"), async (_req, res) => {
+    res.json(await getAnalyticsLiveFeed());
+  });
+
+  app.patch("/api/admin/analytics/settings", requireAuth, requireStaff, requirePermission("settings:write"), async (req, res) => {
+    const { analyticsRetentionDays, auditRetentionDays } = req.body ?? {};
+    if (analyticsRetentionDays != null) {
+      await storage.setSystemMeta("analytics_retention_days", String(Math.max(7, Math.min(365, Number(analyticsRetentionDays) || 90))));
+    }
+    if (auditRetentionDays != null) {
+      await storage.setSystemMeta("audit_retention_days", String(Math.max(30, Math.min(730, Number(auditRetentionDays) || 365))));
+    }
+    await logAdmin(req, "settings.retention_change", "settings", null, { analyticsRetentionDays, auditRetentionDays });
+    res.json(await storage.getAnalyticsRetentionSettings());
+  });
+
+  app.get("/api/admin/health", requireAuth, requireStaff, requirePermission("analytics:read"), async (_req, res) => {
+    const dbOk = await storage.pingDatabase();
+    const webhookMeta = await storage.getSystemMeta("paystack_webhook_last");
+    let webhook: { status: string; event?: string; at: string } | null = null;
+    if (webhookMeta) {
+      try { webhook = JSON.parse(webhookMeta.value); } catch { webhook = null; }
+    }
+    res.json({
+      db: dbOk,
+      emailConfigured: !!(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD),
+      paystackConfigured: !!process.env.PAYSTACK_SECRET_KEY,
+      webhookLast: webhook,
+      serverErrors24h: getServerErrors24h(),
+    });
+  });
+
+  app.get("/api/admin/ops-stats", requireAuth, requireStaff, requirePermission("analytics:read"), async (_req, res) => {
+    res.json(await storage.getOpsStats());
+  });
+
+  app.get("/api/admin/projects", requireAuth, requireStaff, requirePermission("projects:moderate"), async (req, res) => {
+    const search = typeof req.query.search === "string" ? req.query.search : undefined;
+    const sharedOnly = req.query.sharedOnly === "true";
+    const projects = await storage.getAdminProjects({ search, sharedOnly });
+    res.json(projects);
+  });
+
+  app.patch("/api/admin/projects/:id/revoke-share", requireAuth, requireStaff, requirePermission("projects:moderate"), async (req, res) => {
+    const id = safeId(req.params.id);
+    if (!id) return res.status(400).json({ error: "Invalid ID" });
+    const before = await storage.getProject(id);
+    if (!before) return res.status(404).json({ error: "Not found" });
+    const project = await storage.adminRevokeProjectShare(id);
+    await logAdmin(req, "project.share_revoke", "project", id, { title: before.title, userId: before.userId });
+    res.json(project);
+  });
+
+  app.delete("/api/admin/projects/:id", requireAuth, requireStaff, requirePermission("projects:moderate"), async (req, res) => {
+    const id = safeId(req.params.id);
+    if (!id) return res.status(400).json({ error: "Invalid ID" });
+    const before = await storage.getProject(id);
+    if (!before) return res.status(404).json({ error: "Not found" });
+    await storage.deleteProject(id);
+    await logAdmin(req, "project.admin_delete", "project", id, { title: before.title, userId: before.userId });
+    res.json({ ok: true });
+  });
+
+  app.get("/api/admin/users/:id/projects", requireAuth, requireStaff, requirePermission("users:read"), async (req, res) => {
+    const id = safeId(req.params.id);
+    if (!id) return res.status(400).json({ error: "Invalid ID" });
+    const user = await storage.getUser(id);
+    if (!user) return res.status(404).json({ error: "Not found" });
+    res.json(await storage.getAdminUserProjects(id));
+  });
+
+  app.patch("/api/admin/users/:id/note", requireAuth, requireStaff, requirePermission("users:write"), async (req, res) => {
+    const id = safeId(req.params.id);
+    if (!id) return res.status(400).json({ error: "Invalid ID" });
+    const { adminNote } = req.body;
+    const note = typeof adminNote === "string" ? adminNote.slice(0, 2000) : null;
+    const user = await storage.updateUserAdminNote(id, note || null);
+    if (!user) return res.status(404).json({ error: "Not found" });
+    await logAdmin(req, "user.admin_note", "user", id, { email: user.email });
+    res.json(safeAdminUser(user, (await storage.getProjectStatsByUser())[id]));
+  });
+
+  app.post("/api/admin/impersonate/:id", requireAuth, requireStaff, requirePermission("users:impersonate"), async (req, res) => {
+    const id = safeId(req.params.id);
+    if (!id) return res.status(400).json({ error: "Invalid ID" });
+    const target = await storage.getUser(id);
+    if (!target) return res.status(404).json({ error: "Not found" });
+    if (target.role === "admin") return res.status(403).json({ error: "Cannot view as another admin" });
+    req.session.impersonatingUserId = target.id;
+    req.session.impersonatingUserName = target.name;
+    await logAdmin(req, "user.impersonate_start", "user", id, { email: target.email, readOnly: true });
+    res.json({ userId: target.id, userName: target.name, userEmail: target.email });
+  });
+
+  app.delete("/api/admin/impersonate", requireAuth, requireStaff, requirePermission("users:impersonate"), async (req, res) => {
+    const id = req.session.impersonatingUserId;
+    if (id) await logAdmin(req, "user.impersonate_end", "user", id, {});
+    req.session.impersonatingUserId = undefined;
+    req.session.impersonatingUserName = undefined;
+    res.json({ ok: true });
   });
 
   app.post("/api/admin/seed", async (req, res) => {

@@ -7,6 +7,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { CookieBanner } from "./components/CookieBanner";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { AuthProvider } from "./components/AuthProvider";
+import { ImpersonationBanner } from "./components/ImpersonationBanner";
 import { useEffect, useRef, useState } from "react";
 
 import Landing from "./pages/Landing";
@@ -62,6 +63,7 @@ export default function App() {
       <ThemeProvider>
         <AuthProvider>
           <Router hook={useHashLocation}>
+            <ImpersonationBanner />
             <PageTransition>
               <Switch>
                 <Route path="/" component={Landing} />

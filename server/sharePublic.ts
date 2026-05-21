@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import type { Project } from "@shared/schema";
 import { storage } from "./storage";
+import { extractClientIp, hashIp } from "./auditUtils";
 
 function escapeHtml(str: string): string {
   return String(str)
@@ -65,6 +66,28 @@ export function registerSharePublicRoutes(app: import("express").Express) {
     if (!project) {
       return res.status(404).send("Card not found");
     }
+
+    const ip = extractClientIp(req);
+    await storage.recordAnalyticsEvent({
+      eventType: "share_view",
+      pagePath: `/share/${token.slice(0, 8)}…`,
+      resourceType: "project",
+      resourceId: project.id,
+      meta: { title: project.title, userId: project.userId },
+      ipHash: hashIp(ip),
+      referrer: typeof req.headers.referer === "string" ? req.headers.referer : undefined,
+    });
+    await storage.logAuditEvent({
+      actorRole: "guest",
+      action: "share.view",
+      targetType: "project",
+      targetId: project.id,
+      meta: { title: project.title, shareToken: token.slice(0, 8) + "…" },
+      ipAddress: ip,
+      userAgent: typeof req.headers["user-agent"] === "string" ? req.headers["user-agent"] : null,
+      pagePath: `/share/${token.slice(0, 8)}…`,
+      referrer: typeof req.headers.referer === "string" ? req.headers.referer : null,
+    });
 
     const baseUrl = getAppBaseUrl(req);
     const pageUrl = `${baseUrl}/share/${token}`;

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { ShieldAlert } from "lucide-react";
+import { useTelemetry } from "@/hooks/useTelemetry";
 
 export interface AuthUser {
   id: number;
@@ -23,14 +24,20 @@ interface AuthCtx {
   isLoading: boolean;
   isPro: boolean;
   isAdmin: boolean;
+  isStaff: boolean;
+  impersonating: { userId: number; userName: string } | null;
   login: (email?: string, password?: string, googleCredential?: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  startImpersonation: (userId: number) => Promise<void>;
+  exitImpersonation: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthCtx>({
-  user: null, isLoading: true, isPro: false, isAdmin: false,
+  user: null, isLoading: true, isPro: false, isAdmin: false, isStaff: false,
+  impersonating: null,
   login: async () => {}, register: async () => {}, logout: async () => {},
+  startImpersonation: async () => {}, exitImpersonation: async () => {},
 });
 
 // ─── Force Password Change Dialog ────────────────────────────────────────────
@@ -167,6 +174,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const user: AuthUser | null = data?.user ?? null;
+  const impersonating = data?.impersonating ?? null;
+  const staffRoles = ["admin", "support", "content"];
+  useTelemetry({ userId: user?.id ?? null });
+
+  const startImpersonation = async (userId: number) => {
+    const res = await apiRequest("POST", `/api/admin/impersonate/${userId}`);
+    if (!res.ok) throw new Error("Could not start support view");
+    await qc.invalidateQueries({ queryKey: ["/api/auth/me"] });
+  };
+
+  const exitImpersonation = async () => {
+    await apiRequest("DELETE", "/api/admin/impersonate");
+    await qc.invalidateQueries({ queryKey: ["/api/auth/me"] });
+  };
 
   return (
     <AuthContext.Provider value={{
@@ -174,9 +195,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading,
       isPro: user?.tier === "pro",
       isAdmin: user?.role === "admin",
+      isStaff: user ? staffRoles.includes(user.role) : false,
+      impersonating,
       login: (email?: string, password?: string, googleCredential?: string) => loginMutation.mutateAsync({ email, password, googleCredential }),
       register: (name, email, password) => registerMutation.mutateAsync({ name, email, password }),
       logout: () => logoutMutation.mutateAsync(),
+      startImpersonation,
+      exitImpersonation,
     }}>
       {children}
       {needsPwChange && <ForcePasswordDialog onDone={() => setNeedsPwChange(false)} />}

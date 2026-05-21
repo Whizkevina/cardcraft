@@ -2,7 +2,7 @@
 
 Gradual build plan for CardCraft's admin panel — from basic SaaS standards through enterprise polish.
 
-**Last updated:** 2026-05-20 (Phase A shipped)  
+**Last updated:** 2026-05-20 (Analytics & Audit system)  
 **Live admin page:** `client/src/pages/AdminPage.tsx`  
 **Admin API routes:** `server/routes.ts` (`/api/admin/*`)
 
@@ -57,16 +57,16 @@ These exist today and are the foundation for Tiers 1–4.
 |------|--------|-------|
 | Click user row → detail drawer or page | ✅ | Right-side sheet |
 | Show join date (`createdAt`) | ✅ | List + detail drawer |
-| Show last login / last active | ⏳ | Needs `last_login_at` column + auth hook |
-| Show auth method (email vs Google) | ⏳ | Needs `auth_provider` on user or infer from password hash |
+| Show last login / last active | ✅ | `last_login_at` + auth hook |
+| Show auth method (email vs Google) | ✅ | `auth_provider` column |
 | Project count for user | ✅ | List + detail drawer |
-| Total downloads / downloads this period | 🔄 | `downloadsToday` in list + drawer; no lifetime total |
+| Total downloads / downloads this period | ✅ | `totalDownloads` + `downloadsToday` |
 | Share links created count | ✅ | `sharedCount` in list + drawer |
 | Payment history on user profile | ✅ | Detail drawer |
-| Action: send password reset email | ⏳ | Reuse `/api/auth/forgot-password` flow |
-| Action: suspend / ban user | ⏳ | Needs `status` enum on `users` + middleware check |
-| Action: force logout (invalidate sessions) | ⏳ | Delete rows from `session` table for user |
-| Action: grant Pro with optional expiry + reason | 🔄 | Grant Pro + reason logged; no expiry date yet |
+| Action: send password reset email | ✅ | Admin POST + audit log |
+| Action: suspend / ban user | ✅ | `status` enum + middleware |
+| Action: force logout (invalidate sessions) | ✅ | Session table purge |
+| Action: grant Pro with optional expiry + reason | ✅ | Tier PATCH + expiry date |
 
 ### 1.2 Payments & billing tab
 
@@ -75,12 +75,12 @@ These exist today and are the foundation for Tiers 1–4.
 | New **Payments** tab in admin | ✅ | |
 | List all transactions | ✅ | `GET /api/admin/payments` |
 | Filter by status (success / pending / failed) | ✅ | |
-| Filter by date range | ⏳ | |
+| Filter by date range | ✅ | `from` / `to` query params |
 | Filter by user (email search) | ✅ | |
 | Show amount, currency, plan, created date | ✅ | |
 | Manual Pro grant with audit reason | ✅ | Detail drawer + `reason` on tier PATCH |
 | Revenue this month / period | ✅ | Header stat on Payments tab |
-| Refund status field (manual tracking) | ⏳ | Optional column or admin note |
+| Refund status field (manual tracking) | ✅ | `refundNote` column + inline edit |
 
 ### 1.3 Activity & audit log
 
@@ -92,7 +92,7 @@ These exist today and are the foundation for Tiers 1–4.
 | Log template delete / publish | ✅ | Publish/unpublish + delete |
 | Log manual Pro grants | ✅ | Via tier change with reason |
 | **Activity** tab: searchable log | ✅ | |
-| Export audit log CSV | ⏳ | Tier 4 overlap |
+| Export audit log CSV | ✅ | Admin Activity tab export buttons |
 
 ### 1.4 User search & filters
 
@@ -101,8 +101,8 @@ These exist today and are the foundation for Tiers 1–4.
 | Search by name or email | ✅ | Already on Users tab |
 | Filter: Free / Pro | ✅ | |
 | Filter: Admin only | ✅ | Role filter (admin / user) |
-| Filter: joined date range | ⏳ | |
-| Filter: inactive 30+ days | ⏳ | Needs last active |
+| Filter: joined date range | ✅ | From / to date inputs |
+| Filter: inactive 30+ days | ✅ | Uses `lastLoginAt` or join date |
 | Filter: hit download limit today | ✅ | “At download cap” toggle |
 | Sort: newest, most projects, most downloads | ✅ | |
 
@@ -118,41 +118,41 @@ These exist today and are the foundation for Tiers 1–4.
 
 | Task | Status | Notes |
 |------|--------|-------|
-| New **Projects** tab | ⏳ | |
-| List saved cards: user, title, template, updated | ⏳ | |
-| Show share enabled + share token | ⏳ | |
-| Open shared preview (public URL) | ⏳ | |
-| Disable / revoke share link | ⏳ | `share_enabled = false` |
-| Delete user project (support) | ⏳ | Admin-only delete with audit |
-| Filter by shared-only | ⏳ | |
+| New **Projects** tab | ✅ | `AdminProjectsTab` |
+| List saved cards: user, title, template, updated | ✅ | |
+| Show share enabled + share token | ✅ | Live / Off badge |
+| Open shared preview (public URL) | ✅ | `/share/:token` |
+| Disable / revoke share link | ✅ | PATCH revoke-share + audit |
+| Delete user project (support) | ✅ | Admin-only delete with audit |
+| Filter by shared-only | ✅ | Toggle on Projects tab |
 
 ### 2.2 Usage & limits dashboard
 
 | Task | Status | Notes |
 |------|--------|-------|
-| Widget: users at download cap today | ⏳ | Conversion funnel signal |
+| Widget: users at download cap today | ✅ | Analytics tab ops widgets |
 | Widget: bulk generate usage (Pro) | ⏳ | May need event logging |
-| Widget: share link creation count | ⏳ | |
+| Widget: share link creation count | ✅ | Active share links widget |
 | Widget: export format breakdown (PNG/JPG/SVG) | ⏳ | Needs export analytics events |
-| List users near free project limit | ⏳ | `FREE_PROJECT_LIMIT` in schema |
+| List users near free project limit | ✅ | `FREE_PROJECT_LIMIT` in schema |
 
 ### 2.3 Support tools
 
 | Task | Status | Notes |
 |------|--------|-------|
-| Read-only “view as user” (My Cards) | ⏳ | No impersonation session; admin API scoped read |
-| Admin-triggered password reset | ⏳ | Overlap 1.1 |
-| Internal note per user | ⏳ | `users.admin_note` text field |
-| Copy user ID / email quick actions | ⏳ | UX nicety |
+| Read-only “view as user” (My Cards) | 🔄 | User detail drawer lists cards + share preview; no full impersonation |
+| Admin-triggered password reset | ✅ | Overlap 1.1 |
+| Internal note per user | ✅ | `users.admin_note` + save in detail drawer |
+| Copy user ID / email quick actions | ✅ | Detail drawer header |
 
 ### 2.4 System health
 
 | Task | Status | Notes |
 |------|--------|-------|
-| Paystack webhook last success / failure | ⏳ | Store last webhook in DB or env |
-| Email (SMTP) send status indicator | ⏳ | Config present vs missing |
-| Recent server errors count (24h) | ⏳ | Simple error counter middleware |
-| Database connectivity badge | ⏳ | Health check on admin load |
+| Paystack webhook last success / failure | ✅ | `system_meta.paystack_webhook_last` |
+| Email (SMTP) send status indicator | ✅ | Config present vs missing |
+| Recent server errors count (24h) | ✅ | `recordServerError()` middleware |
+| Database connectivity badge | ✅ | Health strip on admin load |
 
 **Tier 2 exit criteria:** Support can handle abuse reports, stuck users, and usage questions from the admin UI alone.
 
@@ -166,12 +166,19 @@ These exist today and are the foundation for Tiers 1–4.
 
 | Task | Status | Notes |
 |------|--------|-------|
-| Signups chart (7 / 30 / 90 days) | ⏳ | Chart library or simple SVG |
-| Revenue chart by period | ⏳ | |
-| Free → Pro conversion funnel | ⏳ | Signup → first card → hit limit → pay |
+| Signups chart (7 / 30 / 90 days) | ✅ | Recharts area chart on Analytics tab |
+| Revenue chart by period | ✅ | |
+| Free → Pro conversion funnel | ✅ | Funnel widget on Analytics tab |
 | Template performance by category | ⏳ | Group `topTemplates` by category |
 | Churn signal: inactive Pro users (14d) | ⏳ | Needs last active |
-| Cards created over time | ⏳ | |
+| Cards created over time | ✅ | Area chart |
+| Real-time active users & live feed | ✅ | Session heartbeats + `/api/admin/analytics/live` |
+| Page / device / browser / referrer breakdown | ✅ | Telemetry + dashboard widgets |
+| Audit: severity, session, UA, masked IP, integrity hash | ✅ | Extended `admin_audit_log` |
+| Audit export CSV / JSON | ✅ | `/api/admin/audit-log/export` |
+| Retention policy (analytics + audit days) | ✅ | `system_meta` + startup purge |
+| Failed login audit events | ✅ | `user.login_failed` |
+| Share link view tracking | ✅ | `share.view` on public share route |
 
 ### 3.2 Template operations
 
@@ -273,10 +280,13 @@ Track migrations needed as tiers ship:
 
 | Column / table | Tier | Purpose |
 |----------------|------|---------|
-| `users.last_login_at` | 1 | Inactivity filters |
-| `users.status` (`active` / `suspended`) | 1 | Ban support |
+| `users.last_login_at` | 1 | ✅ Shipped Phase A |
+| `users.status` (`active` / `suspended`) | 1 | ✅ Shipped Phase A |
 | `users.admin_note` | 2 | Support notes |
-| `users.pro_expires_at` | 1 | Time-limited Pro |
+| `users.pro_expires_at` | 1 | ✅ Shipped Phase A |
+| `users.auth_provider` | 1 | ✅ Shipped Phase A |
+| `users.total_downloads` | 1 | ✅ Shipped Phase A |
+| `payments.refund_note` | 1 | ✅ Shipped Phase A |
 | `admin_audit_log` | 1 | ✅ Shipped Phase A |
 | `templates.featured` | 3 | Landing hero pool |
 | `templates.sort_order` | 3 | Gallery ordering |
@@ -291,7 +301,8 @@ Record completed phases here as you go.
 | Date | Item | Commit / PR |
 |------|------|-------------|
 | — | Baseline admin (analytics, users, templates) | Pre-roadmap |
-| 2026-05-20 | **Phase A** — user drawer, payments tab, audit log, filters | (local — push pending) |
+| 2026-05-20 | **Phase A** — user drawer, payments tab, audit log, filters | `9ffd301` |
+| 2026-05-20 | **Phase A leftovers** — last login, auth provider, suspend/reset/logout, Pro expiry, payment date filter, refund notes, inactive/joined filters | (pending push) |
 
 ---
 

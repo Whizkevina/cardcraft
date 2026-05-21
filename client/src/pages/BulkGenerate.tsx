@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { colorSwatchDataUri } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { trackFeatureEvent } from "@/hooks/useTelemetry";
 import { loadFabric } from "@/lib/loadFabric";
 import { Upload, Download, Layers, FileText, CheckCircle, XCircle, Loader2, Play } from "lucide-react";
 import type { Template } from "@shared/schema";
@@ -214,6 +215,11 @@ export default function BulkGenerate() {
 
     setGenerating(false);
     toast({ title: "All cards generated!", description: "Download each card below." });
+    trackFeatureEvent("bulk_generate", {
+      pagePath: "/bulk",
+      action: "generate_all",
+      meta: { rowCount: rows.length, templateId: Number(templateId) },
+    }).catch(() => {});
   };
 
   const downloadCard = (row: BulkRow) => {
@@ -229,6 +235,11 @@ export default function BulkGenerate() {
     doneRows.forEach((r, i) => {
       setTimeout(() => downloadCard(r), i * 300);
     });
+    trackFeatureEvent("bulk_download", {
+      pagePath: "/bulk",
+      action: "download_all",
+      meta: { count: doneRows.length },
+    }).catch(() => {});
   };
 
   const doneCount = rows.filter(r => r.status === "done").length;
