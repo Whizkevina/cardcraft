@@ -4,65 +4,24 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "../components/AuthProvider";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { trackFeatureEvent } from "@/hooks/useTelemetry";
 import { applySvgTextMode, type SvgTextMode } from "@/lib/svgTextExport";
 import {
   ArrowLeft, Download, Save, Upload, Type, Palette, Layers,
-  AlignLeft, AlignCenter, AlignRight, Bold, Italic,
-  ChevronUp, ChevronDown, Lock, Unlock, Trash2,
-  Image as ImageIcon, RotateCcw, X, Undo2, Redo2,
-  ZoomIn, ZoomOut, Maximize, Wand2, Loader2 as SpinIcon,
-  RefreshCw, MousePointer, Grid3x3, Crown
+  Lock, Unlock,
+  Image as ImageIcon, Undo2, Redo2,
+  ZoomIn, ZoomOut, Maximize, Loader2 as SpinIcon,
+  Grid3x3, Crown
 } from "lucide-react";
 import type { Template, Project } from "@shared/schema";
-import { SharePanel } from "../components/SharePanel";
 import { QRDialog } from "../components/QRDialog";
+import { EditorRightPanel, type EditorRightPanelProps } from "@/components/editor/EditorRightPanel";
+import { EditorMobileMenu } from "@/components/editor/EditorMobileMenu";
+import { EMOJI_PRESETS, type EditorPanelTab, type MobileEditorPanel } from "@/lib/editorConstants";
 import { useFabric } from "@/hooks/useFabric";
 import { loadDesignJson } from "@/lib/loadDesignJson";
-
-const FONTS = ["Georgia", "Arial", "Times New Roman", "Trebuchet MS", "Verdana", "Impact", "Great Vibes", "Courier New", "Tahoma", "Palatino", "Comic Sans MS", "Oswald", "Lucida Console", "Garamond"];
-
-const FONT_PREVIEW_CLASSES: Record<string, string> = {
-  Georgia: "font-preview-georgia",
-  Arial: "font-preview-arial",
-  "Times New Roman": "font-preview-times",
-  "Trebuchet MS": "font-preview-trebuchet",
-  Verdana: "font-preview-verdana",
-  Impact: "font-preview-impact",
-  "Great Vibes": "font-preview-great-vibes",
-  "Courier New": "font-preview-courier",
-  "Tahoma": "font-preview-tahoma",
-  "Palatino": "font-preview-palatino",
-  "Comic Sans MS": "font-preview-comic",
-  "Oswald": "font-preview-oswald",
-  "Lucida Console": "font-preview-lucida",
-  "Garamond": "font-preview-garamond"
-};
-
-const FONT_PREVIEW_CLASS = (font: string) => FONT_PREVIEW_CLASSES[font] || "font-preview-default";
-
-const swatchDataUri = (color: string) =>
-  `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12"><rect width="12" height="12" rx="3" fill="${color}"/></svg>`)}`;
-
-const BG_PRESETS = [
-  { label: "Royal Purple", value: "#1a0533" },
-  { label: "Midnight Blue", value: "#0a1628" },
-  { label: "Coral", value: "#FF6B6B" },
-  { label: "Forest", value: "#1B4332" },
-  { label: "Rose Gold", value: "#c0a080" },
-  { label: "Pearl White", value: "#FAFAF8" },
-  { label: "Charcoal", value: "#2D2D2D" },
-  { label: "Sky Blue", value: "#87CEEB" },
-  { label: "Plum", value: "#4a1942" },
-  { label: "Navy", value: "#0f2744" },
-  { label: "Floral Pink", value: "#fdf6f0" },
-  { label: "Olive", value: "#3d4f1c" },
-];
+import { isTextObject, normalizeCanvasTextObjects, prepareCanvasForExport, sanitizeFabricJsonData } from "@/lib/fabricTextFix";
 
 const EXPORT_PRESETS = [
   { label: "Original (800×1000)", w: 800, h: 1000, multiplier: 2 },
@@ -99,7 +58,7 @@ export default function Editor() {
   const [selectedObj, setSelectedObj] = useState<any>(null);
   const [projectTitle, setProjectTitle] = useState("Untitled Card");
   const [projectId, setProjectId] = useState<number | null>(null);
-  const [mobilePanel, setMobilePanel] = useState<string | null>(null);
+  const [mobilePanel, setMobilePanel] = useState<MobileEditorPanel | null>(null);
   const [qrOpen, setQrOpen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(100);
   const [canUndo, setCanUndo] = useState(false);
@@ -109,6 +68,7 @@ export default function Editor() {
   const [isDirty, setIsDirty] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [showGrid, setShowGrid] = useState(false);
+  const [rightPanelTab, setRightPanelTab] = useState<EditorPanelTab>("style");
   // ref to track replace-photo input for currently selected image
   const replacePhotoInputRef = useRef<HTMLInputElement>(null);
 
@@ -157,12 +117,12 @@ export default function Editor() {
     setCanRedo(false);
   }, []);
 
-  const undo = useCallback(() => {
-    if (historyIndexRef.current <= 0 || !fabricRef.current) return;
-    isHistoryActionRef.current = true;
-    historyIndexRef.current--;
-    const json = historyRef.current[historyIndexRef.current];
-    fabricRef.current.loadFromJSON(json, () => {
+  const loadHistoryState = useCallback((json: string) => {
+    if (!fabricRef.current) return;
+    const data = JSON.parse(json);
+    sanitizeFabricJsonData(data);
+    fabricRef.current.loadFromJSON(data, () => {
+      normalizeCanvasTextObjects(fabricRef.current);
       fabricRef.current.renderAll();
       isHistoryActionRef.current = false;
       setCanUndo(historyIndexRef.current > 0);
@@ -170,18 +130,19 @@ export default function Editor() {
     });
   }, []);
 
+  const undo = useCallback(() => {
+    if (historyIndexRef.current <= 0 || !fabricRef.current) return;
+    isHistoryActionRef.current = true;
+    historyIndexRef.current--;
+    loadHistoryState(historyRef.current[historyIndexRef.current]);
+  }, [loadHistoryState]);
+
   const redo = useCallback(() => {
     if (historyIndexRef.current >= historyRef.current.length - 1 || !fabricRef.current) return;
     isHistoryActionRef.current = true;
     historyIndexRef.current++;
-    const json = historyRef.current[historyIndexRef.current];
-    fabricRef.current.loadFromJSON(json, () => {
-      fabricRef.current.renderAll();
-      isHistoryActionRef.current = false;
-      setCanUndo(historyIndexRef.current > 0);
-      setCanRedo(historyIndexRef.current < historyRef.current.length - 1);
-    });
-  }, []);
+    loadHistoryState(historyRef.current[historyIndexRef.current]);
+  }, [loadHistoryState]);
 
   const syncSelectedObject = useCallback((obj: any | null) => {
     selectedObjectRef.current = obj;
@@ -226,6 +187,8 @@ export default function Editor() {
     });
     canvas.on("object:added", () => { saveHistory(); setIsDirty(true); });
     canvas.on("object:removed", () => { saveHistory(); setIsDirty(true); });
+
+    canvas.on("before:render", () => normalizeCanvasTextObjects(canvas));
 
     // Grid snapping logic
     const grid = 20;
@@ -276,7 +239,7 @@ export default function Editor() {
       const target = e.target as Element | null;
       if (!target) return;
       const inEditorChrome = target.closest(
-        ".editor-panel, [role='listbox'], [data-radix-popper-content-wrapper], [data-radix-select-viewport]",
+        ".editor-panel, [role='tablist'], [role='tab'], [role='listbox'], [data-radix-popper-content-wrapper], [data-radix-select-viewport]",
       );
       panelInteractionRef.current = !!inEditorChrome;
     };
@@ -460,9 +423,16 @@ export default function Editor() {
       canvas.setActiveObject(obj);
     }
 
+    const isTextObj = isTextObject(obj);
+    if (isTextObj) {
+      obj.textBaseline = "alphabetic";
+    }
+
     obj.set(prop, value);
-    if (prop === "fontSize" || prop === "fontFamily" || prop === "text" || prop === "fontWeight" || prop === "fontStyle") {
+    if (isTextObj && (prop === "fontSize" || prop === "fontFamily" || prop === "text" || prop === "fontWeight" || prop === "fontStyle" || prop === "textAlign" || prop === "fill")) {
       obj.initDimensions?.();
+      obj.setCoords?.();
+      obj.dirty = true;
     }
     canvas.renderAll();
     syncSelectedObject(canvas.getActiveObject() ?? obj);
@@ -492,7 +462,10 @@ export default function Editor() {
   const addText = () => {
     const f = (window as any).fabric;
     if (!f || !fabricRef.current) return;
-    const text = new f.IText("New Text", { left: 80, top: 200, fontSize: 24, fontFamily: "Georgia", fill: "#FFFFFF", textAlign: "center" });
+    const text = new f.IText("New Text", {
+      left: 80, top: 200, fontSize: 24, fontFamily: "Georgia", fill: "#FFFFFF",
+      textAlign: "center", textBaseline: "alphabetic",
+    });
     fabricRef.current.add(text);
     fabricRef.current.setActiveObject(text);
     fabricRef.current.renderAll();
@@ -924,6 +897,7 @@ export default function Editor() {
     const currentZoom = canvas.getZoom();
     const f = (window as any).fabric;
     canvas.setZoom(1);
+    prepareCanvasForExport(canvas);
 
     // Apply watermark to non-Pro exports for consistent policy enforcement.
     let wm: any = null;
@@ -938,6 +912,7 @@ export default function Editor() {
         fill: "rgba(255,255,255,0.35)",
         selectable: false,
         evented: false,
+        textBaseline: "alphabetic",
       });
       canvas.add(wm);
       canvas.renderAll();
@@ -946,26 +921,41 @@ export default function Editor() {
     let href = "";
     let extension = format === "jpeg" ? "jpg" : format;
 
-    if (format === "svg") {
-      const width = Math.round(canvas.width * exportPreset.multiplier);
-      const height = Math.round(canvas.height * exportPreset.multiplier);
-      let svg = canvas.toSVG({ suppressPreamble: false });
-      svg = svg.replace(/<svg([^>]*)>/, (_match: string, attrs: string) => {
-        const cleaned = attrs
-          .replace(/\swidth="[^"]*"/g, "")
-          .replace(/\sheight="[^"]*"/g, "")
-          .replace(/\sviewBox="[^"]*"/g, "");
-        return `<svg${cleaned} width="${width}" height="${height}" viewBox="0 0 ${canvas.width} ${canvas.height}">`;
-      });
-      try {
-        svg = await applySvgTextMode(svg, svgTextMode);
-      } catch (err) {
-        console.error("[Editor] SVG text mode failed, exporting raw SVG:", err);
+    try {
+      if (format === "svg") {
+        const width = Math.round(canvas.width * exportPreset.multiplier);
+        const height = Math.round(canvas.height * exportPreset.multiplier);
+        let svg = canvas.toSVG({ suppressPreamble: false });
+        svg = svg.replace(/<svg([^>]*)>/, (_match: string, attrs: string) => {
+          const cleaned = attrs
+            .replace(/\swidth="[^"]*"/g, "")
+            .replace(/\sheight="[^"]*"/g, "")
+            .replace(/\sviewBox="[^"]*"/g, "");
+          return `<svg${cleaned} width="${width}" height="${height}" viewBox="0 0 ${canvas.width} ${canvas.height}">`;
+        });
+        try {
+          svg = await applySvgTextMode(svg, svgTextMode);
+        } catch (err) {
+          console.error("[Editor] SVG text mode failed, exporting raw SVG:", err);
+        }
+        const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+        href = URL.createObjectURL(blob);
+      } else {
+        href = canvas.toDataURL({ format, quality: 0.95, multiplier: exportPreset.multiplier });
       }
-      const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
-      href = URL.createObjectURL(blob);
-    } else {
-      href = canvas.toDataURL({ format, quality: 0.95, multiplier: exportPreset.multiplier });
+    } catch (err) {
+      console.error("[Editor] Export failed:", err);
+      toast({
+        title: "Export failed",
+        description: "Could not generate the file. Try refreshing the page and exporting again.",
+        variant: "destructive",
+      });
+      if (wm) {
+        canvas.remove(wm);
+        canvas.renderAll();
+      }
+      canvas.setZoom(currentZoom);
+      return;
     }
 
     if (wm) {
@@ -1030,20 +1020,78 @@ export default function Editor() {
   const hasPhotoImage = layers.some((o: any) => o.customType === "photo_image" || o.customType === "logo_image");
   const showPhotoHint = hasPhotoFrame && !hasPhotoImage;
 
-  const isText = selectedObj?.type === "i-text" || selectedObj?.type === "text" || selectedObj?.type === "textbox";
-  const isImage = selectedObj?.type === "image";
-  const imageRx = selectedObj?.rx || 0;
-  const textValue = selectedObj?.text || "";
-  const textColor = selectedObj?.fill || "#FFFFFF";
-  const fontSize = selectedObj?.fontSize || 24;
-  const fontFamily = selectedObj?.fontFamily || "Georgia";
-  const textAlign = selectedObj?.textAlign || "left";
-  const isBold = selectedObj?.fontWeight === "bold";
-  const isItalic = selectedObj?.fontStyle === "italic";
-  const rawFill = selectedObj?.fill;
+  const panelSelection = selectedObj ?? selectedObjectRef.current;
+  const isText = isTextObject(panelSelection);
+  const isImage = panelSelection?.type === "image";
+  const imageRx = panelSelection?.rx || 0;
+  const textValue = panelSelection?.text || "";
+  const textColor = panelSelection?.fill || "#FFFFFF";
+  const fontSize = panelSelection?.fontSize || 24;
+  const fontFamily = panelSelection?.fontFamily || "Georgia";
+  const textAlign = panelSelection?.textAlign || "left";
+  const isBold = panelSelection?.fontWeight === "bold";
+  const isItalic = panelSelection?.fontStyle === "italic";
+  const rawFill = panelSelection?.fill;
   const fillColor = typeof rawFill === "string" ? rawFill : "#FFFFFF"; // Protect against gradient objects
-  const isLocked = selectedObj?.selectable === false;
-  const opacity = selectedObj?.opacity !== undefined ? Math.round(selectedObj.opacity * 100) : 100;
+  const isLocked = panelSelection?.selectable === false;
+  const opacity = panelSelection?.opacity !== undefined ? Math.round(panelSelection.opacity * 100) : 100;
+
+  const lastTextSelectionRef = useRef<any>(null);
+  useEffect(() => {
+    if (isText && panelSelection && panelSelection !== lastTextSelectionRef.current) {
+      setRightPanelTab("text");
+      lastTextSelectionRef.current = panelSelection;
+    }
+    if (!panelSelection) {
+      lastTextSelectionRef.current = null;
+    }
+  }, [panelSelection, isText]);
+
+  const clearCanvas = () => {
+    fabricRef.current?.clear();
+    fabricRef.current?.setBackgroundColor("#1a0533", fabricRef.current.renderAll.bind(fabricRef.current));
+    setSelectedObj(null);
+    saveHistory();
+  };
+
+  const editPanelProps: EditorRightPanelProps = {
+    tab: rightPanelTab,
+    onTabChange: setRightPanelTab,
+    panelSelection,
+    isText,
+    isImage,
+    isLocked,
+    opacity,
+    fillColor,
+    imageRx,
+    textValue,
+    textColor,
+    fontSize,
+    fontFamily,
+    textAlign,
+    isBold,
+    isItalic,
+    removingBg,
+    fabricRef,
+    replacePhotoInputRef,
+    projectTitle,
+    projectId,
+    svgTextMode,
+    onSvgTextModeChange: setSvgTextMode,
+    onQROpen: () => setQrOpen(true),
+    updateSelectedProp,
+    bringForward,
+    sendBackward,
+    toggleLock,
+    deleteSelected,
+    setBg,
+    setImageBorderRadius,
+    removeBackground,
+    handleReplacePhoto,
+    getSelectedCanvasObject,
+    syncSelectedObject,
+    onClearCanvas: clearCanvas,
+  };
 
   if (templateId && templateLoading) {
     return (
@@ -1200,7 +1248,7 @@ export default function Editor() {
             <div className="pt-2 border-t border-border mt-2">
               <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-2">Emojis</p>
               <div className="grid grid-cols-5 gap-1">
-                {["❤️", "✨", "🎉", "🔥", "🎂", "🎈", "👑", "💍", "🕊️", "🥂"].map(em => (
+                {EMOJI_PRESETS.map(em => (
                   <button key={em} onClick={() => addEmoji(em)} className="flex items-center justify-center p-1.5 bg-secondary hover:bg-secondary/70 rounded text-xl" title={em}>
                     {em}
                   </button>
@@ -1212,7 +1260,7 @@ export default function Editor() {
 
         {/* ── CANVAS ──────────────────────────────────────────────────────── */}
         <main className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-auto canvas-wrap flex items-start justify-center p-6 sm:p-10">
+          <div className="flex-1 overflow-auto canvas-wrap flex items-start justify-center p-3 sm:p-6 lg:p-10 pb-2">
             <div className="shadow-2xl rounded-sm overflow-hidden flex-shrink-0 relative">
               <canvas ref={canvasRef} id="cardcraft-canvas" data-testid="canvas-editor" />
               {/* Dirty indicator dot */}
@@ -1231,363 +1279,47 @@ export default function Editor() {
             </div>
           </div>
 
-          {/* Mobile toolbar */}
-          <div className="lg:hidden border-t border-border bg-card px-3 py-2 flex items-center gap-1 overflow-x-auto flex-shrink-0">
-            {[
-              { icon: Undo2, label: "Undo", action: undo },
-              { icon: Redo2, label: "Redo", action: redo },
-            ].map(({ icon: Icon, label, action }) => (
-              <button key={label} onClick={action} className="flex-shrink-0 flex flex-col items-center gap-0.5 px-2 py-1.5 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-secondary">
-                <Icon size={15} /><span>{label}</span>
-              </button>
-            ))}
-            <div className="w-px h-6 bg-border mx-1 flex-shrink-0" />
-            {[
-              { icon: Type, label: "Text", action: addText },
-              { icon: ImageIcon, label: "Photo", file: true, isLogo: false },
-              { icon: Upload, label: "Logo", file: true, isLogo: true },
-              { icon: Palette, label: "Style", action: () => setMobilePanel("style") },
-              { icon: Layers, label: "Layers", action: () => setMobilePanel("layers") },
-              { icon: Download, label: "Export", action: () => setMobilePanel("export") },
-            ].map(({ icon: Icon, label, action, file, isLogo }) => (
-              file ? (
-                <label key={label} className="flex-shrink-0 flex flex-col items-center gap-0.5 px-2 py-1.5 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer">
-                  <Icon size={15} /><span>{label}</span>
-                  <input type="file" accept="image/*" className="hidden" onChange={e => handleImageUpload(e, isLogo)} />
-                </label>
-              ) : (
-                <button key={label} onClick={action} className="flex-shrink-0 flex flex-col items-center gap-0.5 px-2 py-1.5 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-secondary">
-                  <Icon size={15} /><span>{label}</span>
-                </button>
-              )
-            ))}
-          </div>
+          <EditorMobileMenu
+            panel={mobilePanel}
+            onPanelChange={setMobilePanel}
+            layers={layers}
+            selectedObj={selectedObj}
+            getLayerLabel={getLayerLabel}
+            onSelectLayer={(obj) => {
+              fabricRef.current?.setActiveObject(obj);
+              fabricRef.current?.renderAll();
+              setSelectedObj(obj);
+            }}
+            undo={undo}
+            redo={redo}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            addText={addText}
+            addShape={addShape}
+            addEmoji={addEmoji}
+            handleImageUpload={handleImageUpload}
+            isUploading={isUploading}
+            zoomLevel={zoomLevel}
+            zoomTo={zoomTo}
+            fitCanvas={fitCanvas}
+            showGrid={showGrid}
+            setShowGrid={setShowGrid}
+            setBg={setBg}
+            exportCard={exportCard}
+            isText={isText}
+            onOpenEdit={() => setRightPanelTab(isText ? "text" : "style")}
+            editPanelProps={editPanelProps}
+          />
         </main>
 
         {/* ── RIGHT PANEL ─────────────────────────────────────────────────── */}
         <aside className="hidden lg:flex flex-col w-64 border-l border-border bg-card flex-shrink-0 overflow-y-auto editor-panel">
-          <Tabs defaultValue="style" className="flex-1 flex flex-col">
-            <TabsList className="w-full rounded-none border-b border-border h-10 bg-card">
-              <TabsTrigger value="style" className="flex-1 text-xs rounded-none data-[state=active]:bg-secondary">Style</TabsTrigger>
-              <TabsTrigger value="text" className="flex-1 text-xs rounded-none data-[state=active]:bg-secondary" disabled={!isText}>Text</TabsTrigger>
-              <TabsTrigger value="export" className="flex-1 text-xs rounded-none data-[state=active]:bg-secondary">Export</TabsTrigger>
-            </TabsList>
-
-            {/* ── Style tab ─────────────────────────────────────────────── */}
-            <TabsContent value="style" className="flex-1 p-3 space-y-4 mt-0 overflow-y-auto">
-              {selectedObj && (
-                <div className="space-y-3">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Object</p>
-                  <div className="grid grid-cols-4 gap-1">
-                    <button onClick={bringForward} title="Bring Forward" className="p-1.5 rounded bg-secondary hover:bg-secondary/70 flex items-center justify-center" data-testid="button-bring-forward"><ChevronUp size={14} /></button>
-                    <button onClick={sendBackward} title="Send Backward" className="p-1.5 rounded bg-secondary hover:bg-secondary/70 flex items-center justify-center" data-testid="button-send-backward"><ChevronDown size={14} /></button>
-                    <button onClick={toggleLock} title={isLocked ? "Unlock" : "Lock"} className="p-1.5 rounded bg-secondary hover:bg-secondary/70 flex items-center justify-center" data-testid="button-toggle-lock">
-                      {isLocked ? <Unlock size={14} /> : <Lock size={14} />}
-                    </button>
-                    <button onClick={deleteSelected} title="Delete" className="p-1.5 rounded bg-destructive/20 hover:bg-destructive/40 text-destructive flex items-center justify-center" data-testid="button-delete-object"><Trash2 size={14} /></button>
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Opacity: {opacity}%</Label>
-                    <Slider min={10} max={100} step={1} value={[opacity]}
-                      onValueChange={([v]) => updateSelectedProp("opacity", v / 100)} data-testid="slider-opacity" />
-                  </div>
-
-                  {!isImage && (
-                    <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">Fill Color</Label>
-                      <div className="flex items-center gap-2">
-                        <input type="color" value={fillColor.startsWith("#") ? fillColor : "#FFFFFF"} aria-label="Fill color" title="Fill color"
-                          onChange={e => updateSelectedProp("fill", e.target.value)}
-                          className="w-8 h-8 rounded cursor-pointer border border-border bg-transparent" data-testid="input-fill-color" />
-                        <span className="text-xs text-muted-foreground">{fillColor}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* ── Image controls ─────────────────────────────── */}
-                  {isImage && (
-                    <div className="space-y-3 pt-2 border-t border-border">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Image</p>
-
-                      {/* Replace photo */}
-                      <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Replace Photo</Label>
-                        <label className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border border-border bg-secondary hover:bg-secondary/70 cursor-pointer transition-colors text-xs" data-testid="label-replace-photo">
-                          <RefreshCw size={13} className="text-primary" />
-                          Swap Photo
-                          <input type="file" accept="image/*" className="hidden" ref={replacePhotoInputRef} onChange={handleReplacePhoto} />
-                        </label>
-                      </div>
-
-                      {/* Corner radius */}
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">Corner Radius</Label>
-                        <div className="grid grid-cols-4 gap-1.5">
-                          {[
-                            { label: "None",   icon: "▭", value: 0 },
-                            { label: "Soft",   icon: "▢", value: 15 },
-                            { label: "Round",  icon: "⬜", value: 35 },
-                            { label: "Circle", icon: "●", value: 50 },
-                          ].map(r => {
-                            const active =
-                              (r.value === 0  && imageRx === 0) ||
-                              (r.value === 15 && imageRx > 0 && imageRx < 25) ||
-                              (r.value === 35 && imageRx >= 25 && imageRx < 50) ||
-                              (r.value === 50 && imageRx >= 50);
-                            return (
-                              <button key={r.value} onClick={() => setImageBorderRadius(r.value)}
-                                title={r.label}
-                                className={`py-2 rounded text-xs font-medium transition-colors border ${active ? "bg-primary text-primary-foreground border-primary" : "bg-secondary border-border text-muted-foreground hover:text-foreground"}`}
-                                data-testid={`button-radius-${r.label.toLowerCase()}`}>
-                                {r.icon}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Remove background */}
-                      <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Background Removal</Label>
-                        <button onClick={removeBackground} disabled={removingBg}
-                          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border border-border bg-secondary hover:bg-secondary/70 disabled:opacity-50 transition-colors text-xs"
-                          data-testid="button-remove-bg">
-                          {removingBg
-                            ? <><SpinIcon size={13} className="animate-spin text-primary" /> Removing background...</>
-                            : <><Wand2 size={13} className="text-gold" /> Remove Background</>}
-                        </button>
-                        <p className="text-[10px] text-muted-foreground leading-relaxed">Automatically removes solid or near-solid backgrounds. Works best on plain backdrops.</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Background</p>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {BG_PRESETS.map(bg => (
-                    <button key={bg.value} onClick={() => setBg(bg.value)} title={bg.label}
-                      className="w-full aspect-square rounded-md border border-border hover:scale-110 transition-transform"
-                      data-testid={`button-bg-${bg.label.replace(/\s+/g, "-").toLowerCase()}`}>
-                      <img alt="" aria-hidden="true" src={swatchDataUri(bg.value)} className="w-full h-full rounded-md object-cover" />
-                    </button>
-                  ))}
-                </div>
-                <div className="flex items-center gap-2">
-                  <input type="color" defaultValue="#1a0533" onChange={e => setBg(e.target.value)}
-                    className="w-8 h-8 rounded cursor-pointer border border-border bg-transparent" data-testid="input-bg-color" />
-                  <span className="text-xs text-muted-foreground">Custom color</span>
-                </div>
-                
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider !mt-6">Gradient Backgrounds</p>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {BG_PRESETS.map(bg => (
-                    <button key={`grad-${bg.value}`} onClick={() => setBg(bg.value, "gradient")} title={`${bg.label} Gradient`}
-                      className="w-full aspect-square rounded-md border border-border hover:scale-110 transition-transform"
-                      style={{ background: `linear-gradient(to bottom, ${bg.value}, #111)` }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <button onClick={() => { fabricRef.current?.clear(); fabricRef.current?.setBackgroundColor("#1a0533", fabricRef.current.renderAll.bind(fabricRef.current)); setSelectedObj(null); saveHistory(); }}
-                className="w-full text-xs px-3 py-2 rounded bg-secondary hover:bg-secondary/70 flex items-center gap-2 text-muted-foreground" data-testid="button-reset-canvas">
-                <RotateCcw size={12} /> Clear Canvas
-              </button>
-            </TabsContent>
-
-            {/* ── Text tab ──────────────────────────────────────────────── */}
-            <TabsContent value="text" className="flex-1 p-3 space-y-4 mt-0 overflow-y-auto">
-              {isText ? (
-                <>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Text Content</Label>
-                    <textarea className="w-full bg-input text-xs p-2 rounded border border-border focus:outline-none focus:ring-1 focus:ring-ring resize-none"
-                      rows={3} placeholder="Edit text" value={textValue} onChange={e => updateSelectedProp("text", e.target.value)} data-testid="textarea-text-content" />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Font Family</Label>
-                    <Select value={fontFamily} onValueChange={v => updateSelectedProp("fontFamily", v)}>
-                      <SelectTrigger className="h-8 text-xs" data-testid="select-font-family">
-                        <SelectValue>
-                          <span className={FONT_PREVIEW_CLASS(fontFamily)}>{fontFamily}</span>
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {FONTS.map(f => (
-                          <SelectItem key={f} value={f}>
-                            <span className={FONT_PREVIEW_CLASS(f)}>{f}</span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Font Size: {fontSize}px</Label>
-                    <Slider min={8} max={100} step={1} value={[fontSize]} onValueChange={([v]) => updateSelectedProp("fontSize", v)} data-testid="slider-font-size" />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Text Color</Label>
-                    <input type="color" value={textColor.startsWith("#") ? textColor : "#FFFFFF"} aria-label="Text color" title="Text color"
-                      onChange={e => updateSelectedProp("fill", e.target.value)}
-                      className="w-8 h-8 rounded cursor-pointer border border-border bg-transparent" data-testid="input-text-color" />
-                  </div>
-
-                  {/* Text opacity */}
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Opacity: {opacity}%</Label>
-                    <Slider min={10} max={100} step={1} value={[opacity]} onValueChange={([v]) => updateSelectedProp("opacity", v / 100)} />
-                  </div>
-
-                  {/* Style buttons */}
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Style & Alignment</Label>
-                    <div className="flex items-center gap-1 flex-wrap">
-                      <button onClick={() => updateSelectedProp("fontWeight", isBold ? "normal" : "bold")} title="Bold"
-                        className={`p-1.5 rounded border text-xs ${isBold ? "bg-primary text-primary-foreground border-primary" : "bg-secondary border-border"}`} data-testid="button-bold"><Bold size={12} /></button>
-                      <button onClick={() => updateSelectedProp("fontStyle", isItalic ? "normal" : "italic")} title="Italic"
-                        className={`p-1.5 rounded border text-xs ${isItalic ? "bg-primary text-primary-foreground border-primary" : "bg-secondary border-border"}`} data-testid="button-italic"><Italic size={12} /></button>
-                      <button onClick={() => updateSelectedProp("textAlign", "left")} title="Align left" className={`p-1.5 rounded border ${textAlign === "left" ? "bg-primary text-primary-foreground border-primary" : "bg-secondary border-border"}`}><AlignLeft size={12} /></button>
-                      <button onClick={() => updateSelectedProp("textAlign", "center")} title="Align center" className={`p-1.5 rounded border ${textAlign === "center" ? "bg-primary text-primary-foreground border-primary" : "bg-secondary border-border"}`}><AlignCenter size={12} /></button>
-                      <button onClick={() => updateSelectedProp("textAlign", "right")} title="Align right" className={`p-1.5 rounded border ${textAlign === "right" ? "bg-primary text-primary-foreground border-primary" : "bg-secondary border-border"}`}><AlignRight size={12} /></button>
-                    </div>
-                  </div>
-
-                  {/* Shadow toggle */}
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Text Shadow</Label>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          const canvas = fabricRef.current;
-                          const obj = getSelectedCanvasObject();
-                          if (!canvas || !obj) return;
-                          const f = (window as any).fabric;
-                          if (obj.shadow) { obj.set("shadow", null); }
-                          else { obj.set("shadow", new f.Shadow({ color: "rgba(0,0,0,0.5)", blur: 6, offsetX: 2, offsetY: 2 })); }
-                          canvas.renderAll();
-                          syncSelectedObject(canvas.getActiveObject() ?? obj);
-                        }}
-                        className={`flex-1 text-xs px-2 py-1.5 rounded border ${selectedObj?.shadow ? "bg-primary text-primary-foreground border-primary" : "bg-secondary border-border"}`}
-                        data-testid="button-shadow"
-                      >
-                        {selectedObj?.shadow ? "Shadow On" : "Shadow Off"}
-                      </button>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="text-center py-8">
-                  <Type size={24} className="mx-auto text-muted-foreground mb-2" />
-                  <p className="text-xs text-muted-foreground">Select a text element to edit</p>
-                </div>
-              )}
-            </TabsContent>
-
-            {/* ── Export & Share tab ───────────────────────────────────── */}
-            <TabsContent value="export" className="flex-1 p-3 mt-0 overflow-y-auto">
-              <SharePanel
-                fabricRef={fabricRef}
-                projectTitle={projectTitle}
-                projectId={projectId}
-                onQROpen={() => setQrOpen(true)}
-                svgTextMode={svgTextMode}
-                onSvgTextModeChange={setSvgTextMode}
-              />
-            </TabsContent>
-          </Tabs>
+          <EditorRightPanel {...editPanelProps} className="flex-1" />
         </aside>
       </div>
 
       {/* ── QR Code Dialog ────────────────────────────────────────────────── */}
       <QRDialog open={qrOpen} onClose={() => setQrOpen(false)} fabricRef={fabricRef} />
-
-      {/* ── MOBILE BOTTOM SHEET ──────────────────────────────────────────── */}
-      {mobilePanel && (
-        <div className="fixed inset-0 z-50 lg:hidden" onClick={() => setMobilePanel(null)}>
-          <div className="absolute inset-0 bg-black/60" />
-          <div
-            className="absolute bottom-0 left-0 right-0 bg-card border-t border-border rounded-t-2xl flex flex-col max-h-[75vh]"
-            onClick={e => e.stopPropagation()}
-          >
-            {/* Drag handle */}
-            <div className="flex justify-center pt-2 pb-1 flex-shrink-0">
-              <div className="w-10 h-1 rounded-full bg-border" />
-            </div>
-            <div className="flex items-center justify-between px-4 py-2 flex-shrink-0 border-b border-border">
-              <h3 className="font-semibold text-sm capitalize">{mobilePanel}</h3>
-              <button onClick={() => setMobilePanel(null)} title="Close panel" className="p-1.5 rounded-full hover:bg-secondary"><X size={16} /></button>
-            </div>
-            <div className="overflow-y-auto flex-1 p-4">
-
-            {mobilePanel === "style" && (
-              <div className="space-y-4">
-                {isText && (
-                  <div className="space-y-2">
-                    <Label className="text-xs">Text Content</Label>
-                    <textarea className="w-full bg-input text-xs p-2 rounded border border-border focus:outline-none resize-none" rows={2} placeholder="Edit text"
-                      value={textValue} onChange={e => updateSelectedProp("text", e.target.value)} />
-                    <div className="flex gap-2">
-                      <div className="flex-1">
-                        <Label className="text-xs block mb-1">Font Size: {fontSize}px</Label>
-                        <Slider min={8} max={100} step={1} value={[fontSize]} onValueChange={([v]) => updateSelectedProp("fontSize", v)} />
-                      </div>
-                    </div>
-                    <div className="flex gap-2 items-center">
-                      <Label className="text-xs">Color:</Label>
-                      <input type="color" value={textColor.startsWith("#") ? textColor : "#ffffff"} aria-label="Text color" title="Text color"
-                        onChange={e => updateSelectedProp("fill", e.target.value)}
-                        className="w-8 h-8 rounded cursor-pointer border border-border" />
-                    </div>
-                  </div>
-                )}
-                <div>
-                  <Label className="text-xs block mb-2">Background</Label>
-                  <div className="grid grid-cols-6 gap-1.5">
-                    {BG_PRESETS.map(bg => (
-                      <button key={bg.value} onClick={() => { setBg(bg.value); setMobilePanel(null); }} title={bg.label}
-                        className="w-full aspect-square rounded border border-border hover:scale-110 transition-transform overflow-hidden">
-                          <img alt="" aria-hidden="true" src={swatchDataUri(bg.value)} className="w-full h-full object-cover" />
-                        </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {mobilePanel === "layers" && (
-              <div className="space-y-1">
-                {layers.map((obj, i) => (
-                  <button key={i} onClick={() => { fabricRef.current?.setActiveObject(obj); fabricRef.current?.renderAll(); setSelectedObj(obj); setMobilePanel(null); }}
-                    className="w-full text-left px-3 py-2 rounded text-sm flex items-center gap-2 hover:bg-secondary">
-                    {obj.type === "i-text" || obj.type === "text" || obj.type === "textbox" ? <Type size={12} /> : <ImageIcon size={12} />}
-                    <span className="truncate">{getLayerLabel(obj)}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {mobilePanel === "export" && (
-              <div>
-                <SharePanel
-                  fabricRef={fabricRef}
-                  projectTitle={projectTitle}
-                  projectId={projectId}
-                  onQROpen={() => { setMobilePanel(null); setQrOpen(true); }}
-                  svgTextMode={svgTextMode}
-                  onSvgTextModeChange={setSvgTextMode}
-                />
-              </div>
-            )}
-            </div>{/* overflow scroll end */}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

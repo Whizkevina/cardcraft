@@ -1,17 +1,16 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "./AuthProvider";
-import { useTheme } from "./ThemeProvider";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
-import { Sun, Moon, User, LogOut, FolderOpen, Shield, Layers, Sparkles, Settings, CreditCard } from "lucide-react";
+import { User, LogOut, FolderOpen, Shield, Layers, Sparkles, Settings, CreditCard } from "lucide-react";
+import { useCtaTracking } from "@/hooks/useTelemetry";
 
 export default function Navbar() {
   const { user, isPro, isAdmin, logout } = useAuth();
-  const { theme, toggle } = useTheme();
+  const trackCta = useCtaTracking();
   const [location] = useLocation();
   const isEditor = location.startsWith("/editor");
 
@@ -26,11 +25,11 @@ export default function Navbar() {
   ];
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/80 navbar-glass">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
+    <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur-md supports-[backdrop-filter]:bg-background/75">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-[3.75rem]">
         {/* Logo */}
         <Link href="/">
-          <div className="flex items-center gap-2 select-none" data-testid="link-home">
+          <div className="flex items-center gap-2.5 select-none" data-testid="link-home">
             <svg aria-label="CardCraft" viewBox="0 0 32 32" fill="none" className="w-7 h-7">
               <rect width="32" height="32" rx="8" fill="hsl(43 96% 58%)"/>
               <rect x="6" y="8" width="20" height="16" rx="3" fill="none" stroke="hsl(240 20% 7%)" strokeWidth="2"/>
@@ -38,7 +37,7 @@ export default function Navbar() {
               <circle cx="10" cy="20" r="1.5" fill="hsl(240 20% 7%)"/>
               <path d="M13 20h9" stroke="hsl(240 20% 7%)" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
-            <span className="font-bold text-base tracking-tight logo-text hidden sm:block">CardCraft</span>
+            <span className="font-serif text-base font-semibold tracking-tight hidden sm:block">CardCraft</span>
           </div>
         </Link>
 
@@ -69,11 +68,6 @@ export default function Navbar() {
 
         {/* Right side */}
         <div className="flex items-center gap-2">
-          <button onClick={toggle} data-testid="button-theme-toggle"
-            className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" aria-label="Toggle theme">
-            {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
-          </button>
-
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -144,11 +138,11 @@ export default function Navbar() {
             </DropdownMenu>
           ) : (
             <div className="flex items-center gap-2">
-              <Link href="/auth">
+              <Link href="/auth" onClick={() => trackCta("nav_sign_in")}>
                 <button className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 px-3" data-testid="button-login">Sign In</button>
               </Link>
-              <Link href="/templates">
-                <button className="inline-flex items-center justify-center rounded-lg text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring h-9 px-4 btn-gold" data-testid="button-get-started">Get Started</button>
+              <Link href="/templates" onClick={() => trackCta("nav_get_started")}>
+                <button className="inline-flex items-center justify-center rounded-lg text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring h-9 px-4 btn-gold shadow-none" data-testid="button-get-started">Get Started</button>
               </Link>
             </div>
           )}

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
   Crown, Shield, Calendar, FolderOpen, Share2, Download, CreditCard,
-  LogIn, KeyRound, Ban, LogOut, Mail, Copy, ExternalLink, Eye,
+  LogIn, KeyRound, Ban, LogOut, Mail, Copy, ExternalLink, Eye, Trash2,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/components/AuthProvider";
@@ -14,6 +14,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import type { AdminPayment, AdminUser, AdminUserProject } from "./types";
 import { formatKobo, sharePreviewUrl } from "./types";
 
@@ -24,6 +28,9 @@ interface UserDetailSheetProps {
   currentUserId: number;
   onTierChange: (id: number, tier: "free" | "pro", reason?: string, proExpiresAt?: string) => void;
   onRoleChange: (id: number, role: "user" | "admin") => void;
+  onDelete?: (id: number) => void;
+  canDelete?: boolean;
+  deletePending?: boolean;
 }
 
 function Stat({ label, value, icon: Icon }: { label: string; value: string | number; icon: typeof Calendar }) {
@@ -45,6 +52,9 @@ export function UserDetailSheet({
   currentUserId,
   onTierChange,
   onRoleChange,
+  onDelete,
+  canDelete = false,
+  deletePending = false,
 }: UserDetailSheetProps) {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -144,6 +154,7 @@ export function UserDetailSheet({
   const isAdmin = user?.role === "admin";
   const isSuspended = user?.status === "suspended";
   const isSelf = user?.id === currentUserId;
+  const deletable = canDelete && user && !isSelf && user.role !== "admin";
 
   useEffect(() => {
     if (!open) {
@@ -360,6 +371,44 @@ export function UserDetailSheet({
                     <Ban size={12} /> {isSuspended ? "Reactivate" : "Suspend"}
                   </Button>
                 </div>
+              </div>
+            )}
+
+            {deletable && onDelete && (
+              <div className="space-y-2 pt-2 border-t border-destructive/20">
+                <h4 className="text-xs font-semibold text-destructive uppercase tracking-wide">Danger zone</h4>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="destructive"
+                      className="h-8 text-xs gap-1.5 w-full sm:w-auto"
+                      disabled={deletePending}
+                      data-testid="button-delete-user"
+                    >
+                      <Trash2 size={12} /> Delete user permanently
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete {user.name}?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This permanently removes {user.email}, all their projects, payments, and analytics data. This cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        disabled={deletePending}
+                        onClick={() => onDelete(user.id)}
+                      >
+                        Delete permanently
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             )}
 

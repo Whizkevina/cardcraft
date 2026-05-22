@@ -1,17 +1,22 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "../components/AuthProvider";
-import Navbar from "../components/Navbar";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { CreditCard, CheckCircle, XCircle, Clock, Download, ArrowRight, Sparkles } from "lucide-react";
+import { MarketingPageShell } from "@/components/marketing/MarketingPageShell";
+import { MarketingSection } from "@/components/marketing/MarketingSection";
+import { AppPageHeader } from "@/components/marketing/AppPageHeader";
+import { SurfaceCard } from "@/components/marketing/SurfaceCard";
+import { EmptyState } from "@/components/marketing/EmptyState";
+import { hp, hpCn } from "@/components/marketing/homeTokens";
+import { CreditCard, CheckCircle, XCircle, Clock, ArrowRight, Sparkles } from "lucide-react";
 import { format } from "date-fns";
 import type { Payment } from "@shared/schema";
 
 const STATUS_CONFIG = {
   success: { label: "Paid", icon: CheckCircle, color: "text-green-500", bg: "bg-green-500/10" },
   pending: { label: "Pending", icon: Clock, color: "text-yellow-500", bg: "bg-yellow-500/10" },
-  failed:  { label: "Failed",  icon: XCircle,  color: "text-destructive",  bg: "bg-destructive/10" },
+  failed: { label: "Failed", icon: XCircle, color: "text-destructive", bg: "bg-destructive/10" },
 };
 
 export default function PaymentsPage() {
@@ -29,14 +34,16 @@ export default function PaymentsPage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen">
-        <Navbar />
-        <div className="max-w-md mx-auto px-4 py-20 text-center">
-          <CreditCard size={40} className="mx-auto text-muted-foreground mb-4" />
-          <h2 className="text-xl font-bold mb-2">Sign in to view payments</h2>
-          <Link href="/auth"><Button className="bg-primary text-primary-foreground hover:bg-primary/90 mt-4">Sign In</Button></Link>
-        </div>
-      </div>
+      <MarketingPageShell>
+        <MarketingSection spacing="default" containerClassName="max-w-lg mx-auto px-4 sm:px-6">
+          <EmptyState
+            icon={CreditCard}
+            title="Sign in to view payments"
+            description="Your receipts and transaction history are available after you sign in."
+            actions={[{ label: "Sign In", href: "/auth" }]}
+          />
+        </MarketingSection>
+      </MarketingPageShell>
     );
   }
 
@@ -44,25 +51,23 @@ export default function PaymentsPage() {
   const totalPaid = successPayments.reduce((sum, p) => sum + (p.amount / 100), 0);
 
   return (
-    <div className="min-h-screen">
-      <Navbar />
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-10">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-2xl font-bold mb-1 font-display">Payment History</h1>
-            <p className="text-muted-foreground text-sm">Your receipts and transaction records.</p>
-          </div>
-          {!isPro && (
-            <Link href="/pricing">
-              <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2">
-                <Sparkles size={14} /> Upgrade to Pro
-              </Button>
-            </Link>
-          )}
-        </div>
+    <MarketingPageShell>
+      <MarketingSection spacing="default" containerClassName="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+        <AppPageHeader
+          eyebrow="Billing"
+          title="Payment history"
+          description="Your receipts and transaction records."
+          action={
+            !isPro ? (
+              <Link href="/pricing">
+                <Button size="sm" className={hp.btnPrimary}>
+                  <Sparkles size={14} /> Upgrade to Pro
+                </Button>
+              </Link>
+            ) : undefined
+          }
+        />
 
-        {/* Stats */}
         {successPayments.length > 0 && (
           <div className="grid grid-cols-3 gap-4 mb-8">
             {[
@@ -70,37 +75,36 @@ export default function PaymentsPage() {
               { label: "Transactions", value: payments.length },
               { label: "Current Plan", value: isPro ? "Pro" : "Free" },
             ].map(s => (
-              <div key={s.label} className="bg-card border border-border rounded-xl p-4 text-center">
+              <SurfaceCard key={s.label} variant="raised" className="p-4 text-center">
                 <p className="text-xl font-bold text-gold">{s.value}</p>
                 <p className="text-xs text-muted-foreground mt-1">{s.label}</p>
-              </div>
+              </SurfaceCard>
             ))}
           </div>
         )}
 
-        {/* Transactions */}
         {isLoading ? (
           <div className="space-y-3">
             {[1, 2].map(i => <div key={i} className="h-20 skeleton rounded-xl" />)}
           </div>
         ) : payments.length === 0 ? (
-          <div className="text-center py-16 border border-dashed border-border rounded-2xl">
+          <SurfaceCard variant="inset" className="p-10 text-center">
             <CreditCard size={40} className="mx-auto text-muted-foreground mb-4" />
-            <h3 className="font-semibold mb-2">No payments yet</h3>
-            <p className="text-muted-foreground text-sm mb-5">Upgrade to Pro to unlock unlimited downloads.</p>
+            <h3 className={hpCn(hp.display, "text-lg mb-2")}>No payments yet</h3>
+            <p className={hpCn(hp.lead, "text-sm mb-5")}>Upgrade to Pro to unlock unlimited downloads.</p>
             <Link href="/pricing">
-              <Button className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2">
+              <Button className={hp.btnPrimary}>
                 <ArrowRight size={14} /> View Pricing
               </Button>
             </Link>
-          </div>
+          </SurfaceCard>
         ) : (
           <div className="space-y-3">
             {payments.map(p => {
               const cfg = STATUS_CONFIG[p.status] || STATUS_CONFIG.pending;
               const Icon = cfg.icon;
               return (
-                <div key={p.id} className="bg-card border border-border rounded-xl p-5 flex items-center gap-4" data-testid={`row-payment-${p.id}`}>
+                <SurfaceCard key={p.id} variant="raised" className="p-5 flex items-center gap-4" testId={`row-payment-${p.id}`}>
                   <div className={`w-10 h-10 rounded-full ${cfg.bg} flex items-center justify-center flex-shrink-0`}>
                     <Icon size={18} className={cfg.color} />
                   </div>
@@ -119,12 +123,12 @@ export default function PaymentsPage() {
                       {cfg.label}
                     </span>
                   </div>
-                </div>
+                </SurfaceCard>
               );
             })}
           </div>
         )}
-      </main>
-    </div>
+      </MarketingSection>
+    </MarketingPageShell>
   );
 }

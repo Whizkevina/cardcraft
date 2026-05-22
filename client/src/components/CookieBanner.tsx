@@ -16,11 +16,13 @@ export function CookieBanner() {
 
   const handleAccept = () => {
     localStorage.setItem("cookie_consent", "accepted");
+    window.dispatchEvent(new Event("cookie-consent-changed"));
     setIsVisible(false);
   };
 
   const handleDecline = () => {
     localStorage.setItem("cookie_consent", "declined");
+    window.dispatchEvent(new Event("cookie-consent-changed"));
     setIsVisible(false);
   };
 

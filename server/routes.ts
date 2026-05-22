@@ -15,10 +15,13 @@ import { getServerErrors24h } from "./metrics";
 import { getPaystackPublic, getPaystackSecret, getSessionSecret } from "./env";
 import { buildPricingQuote } from "./pricing";
 import { registerSharePublicRoutes } from "./sharePublic";
+import { registerSeoRoutes } from "./seoRoutes";
 import { extractClientIp, hashIp, parseUserAgent } from "./auditUtils";
 import { getAnalyticsDashboard, getAnalyticsLiveFeed, runRetentionCleanup } from "./analyticsService";
 import { initGeoIp, lookupCountry } from "./geoip";
 import { hasPermission, requireStaffRole, type Permission } from "./permissions";
+import { resolveTelemetryActor } from "./telemetryContext";
+import { isLikelyBot } from "./botDetection";
 
 declare module "express-session" {
   interface SessionData {
@@ -30,6 +33,7 @@ declare module "express-session" {
     guestDownloadDate?: string;
     impersonatingUserId?: number;
     impersonatingUserName?: string;
+    analyticsGuest?: boolean;
   }
 }
 
@@ -395,6 +399,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   runRetentionCleanup().catch(e => console.error("[retention]", e));
 
   // Public share pages for crawlers (OG tags) — before SPA catch-all
+  registerSeoRoutes(app);
   registerSharePublicRoutes(app);
 
   // Session — secure cookie in production
@@ -626,20 +631,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   const telemetryLimiter = rateLimit({ windowMs: 60_000, max: 120, standardHeaders: true, legacyHeaders: false });
 
-  app.post("/api/telemetry/heartbeat", telemetryLimiter, requireAuth, async (req, res) => {
-    const user = await storage.getUser(req.session.userId!);
-    if (!user) return res.status(401).json({ error: "Unauthorized" });
+  app.post("/api/telemetry/heartbeat", telemetryLimiter, async (req, res) => {
+    const actor = await resolveTelemetryActor(req);
     const { pagePath, referrer, utmSource, utmCampaign, browser, os, deviceType } = req.body ?? {};
-    const sessionKey = req.sessionID ? crypto.createHash("sha256").update(req.sessionID).digest("hex").slice(0, 32) : `u${user.id}`;
-    const ip = extractClientIp(req);
-    const country = lookupCountry(ip);
     await storage.upsertAnalyticsSession({
-      sessionKey,
-      userId: user.id,
-      userName: user.name,
-      userEmail: user.email,
-      userRole: user.role,
-      userTier: user.tier,
+      sessionKey: actor.sessionKey,
+      userId: actor.userId,
+      userName: actor.userName ?? "Guest",
+      userEmail: actor.userEmail ?? undefined,
+      userRole: actor.userRole,
+      userTier: actor.userTier ?? undefined,
       pagePath: typeof pagePath === "string" ? pagePath.slice(0, 256) : undefined,
       referrer: typeof referrer === "string" ? referrer.slice(0, 512) : undefined,
       utmSource: typeof utmSource === "string" ? utmSource.slice(0, 128) : undefined,
@@ -647,33 +648,35 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       browser: typeof browser === "string" ? browser.slice(0, 64) : undefined,
       os: typeof os === "string" ? os.slice(0, 64) : undefined,
       deviceType: typeof deviceType === "string" ? deviceType.slice(0, 32) : undefined,
-      country,
+      country: actor.country,
     });
     res.json({ ok: true });
   });
 
-  app.post("/api/telemetry/event", telemetryLimiter, requireAuth, async (req, res) => {
-    const userId = req.session.userId!;
+  app.post("/api/telemetry/event", telemetryLimiter, async (req, res) => {
+    const actor = await resolveTelemetryActor(req);
     const { eventType, pagePath, action, resourceType, resourceId, meta, browser, os, deviceType, referrer } = req.body ?? {};
     if (!eventType || typeof eventType !== "string") return res.status(400).json({ error: "eventType required" });
-    const allowed = ["page_view", "feature_click", "conversion", "download", "share_create", "bulk_generate", "bulk_download"];
+    const allowed = ["page_view", "feature_click", "conversion", "download", "share_create", "bulk_generate", "bulk_download", "cta_click"];
     if (!allowed.includes(eventType)) return res.status(400).json({ error: "Invalid eventType" });
-    const sessionKey = req.sessionID ? crypto.createHash("sha256").update(req.sessionID).digest("hex").slice(0, 32) : `u${userId}`;
-    const ip = extractClientIp(req);
+    const mergedMeta = {
+      ...(meta && typeof meta === "object" ? meta as Record<string, unknown> : {}),
+      visitorType: actor.visitorType,
+    };
     await storage.recordAnalyticsEvent({
-      sessionKey,
-      userId,
+      sessionKey: actor.sessionKey,
+      userId: actor.userId > 0 ? actor.userId : null,
       eventType,
       pagePath: typeof pagePath === "string" ? pagePath : undefined,
       action: typeof action === "string" ? action : undefined,
       resourceType: typeof resourceType === "string" ? resourceType : undefined,
       resourceId: Number.isInteger(resourceId) ? resourceId : null,
-      meta: meta && typeof meta === "object" ? meta : undefined,
+      meta: mergedMeta,
       browser: typeof browser === "string" ? browser : undefined,
       os: typeof os === "string" ? os : undefined,
       deviceType: typeof deviceType === "string" ? deviceType : undefined,
       referrer: typeof referrer === "string" ? referrer : undefined,
-      ipHash: hashIp(ip),
+      ipHash: actor.ipHash,
     });
     res.json({ ok: true });
   });
@@ -1192,6 +1195,50 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (status === "suspended") await storage.destroyUserSessions(id);
     await logAdmin(req, "user.status_change", "user", id, { from: before.status, to: status, email: before.email });
     res.json(safeAdminUser(user, (await storage.getProjectStatsByUser())[id]));
+  });
+
+  app.delete("/api/admin/users/:id", requireAuth, requireStaff, requirePermission("users:delete"), async (req, res) => {
+    const id = safeId(req.params.id);
+    if (!id) return res.status(400).json({ error: "Invalid ID" });
+    if (id === req.session.userId) return res.status(400).json({ error: "Cannot delete yourself" });
+    const target = await storage.getUser(id);
+    if (!target) return res.status(404).json({ error: "Not found" });
+    if (target.role === "admin") return res.status(400).json({ error: "Cannot delete admin accounts" });
+    await logAdmin(req, "user.delete", "user", id, { email: target.email, name: target.name });
+    const deleted = await storage.deleteUser(id);
+    if (!deleted) return res.status(404).json({ error: "Not found" });
+    res.json({ ok: true });
+  });
+
+  app.post("/api/admin/users/bulk-delete", requireAuth, requireStaff, requirePermission("users:delete"), async (req, res) => {
+    const raw = req.body?.ids;
+    const ids = Array.isArray(raw)
+      ? raw.map((v: unknown) => Number(v)).filter((n: number) => Number.isFinite(n) && n > 0)
+      : [];
+    if (ids.length === 0) return res.status(400).json({ error: "No valid user IDs" });
+
+    const failed: { id: number; reason: string }[] = [];
+    let deleted = 0;
+    for (const id of ids) {
+      if (id === req.session.userId) {
+        failed.push({ id, reason: "self" });
+        continue;
+      }
+      const target = await storage.getUser(id);
+      if (!target) {
+        failed.push({ id, reason: "not_found" });
+        continue;
+      }
+      if (target.role === "admin") {
+        failed.push({ id, reason: "admin" });
+        continue;
+      }
+      await logAdmin(req, "user.delete", "user", id, { email: target.email, name: target.name, bulk: true });
+      const ok = await storage.deleteUser(id);
+      if (ok) deleted++;
+      else failed.push({ id, reason: "not_found" });
+    }
+    res.json({ deleted, failed });
   });
 
   app.get("/api/admin/audit-log", requireAuth, requireStaff, requirePermission("audit:read"), async (req, res) => {

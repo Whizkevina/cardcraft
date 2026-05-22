@@ -1,9 +1,8 @@
-import { SectionBadge } from "./SectionBadge";
-import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { hp, hpCn } from "./homeTokens";
 
 interface PageHeaderProps {
-  badge?: { icon?: LucideIcon; label: string };
+  eyebrow?: string;
   title: ReactNode;
   description?: ReactNode;
   align?: "left" | "center";
@@ -11,7 +10,7 @@ interface PageHeaderProps {
 }
 
 export function PageHeader({
-  badge,
+  eyebrow,
   title,
   description,
   align = "center",
@@ -20,20 +19,24 @@ export function PageHeader({
   const centered = align === "center";
 
   return (
-    <div className={`mb-12 ${centered ? "text-center" : ""} ${className}`}>
-      {badge ? (
-        <div className={centered ? "mb-4" : "mb-4"}>
-          <SectionBadge icon={badge.icon}>{badge.label}</SectionBadge>
-        </div>
+    <header
+      className={hpCn(
+        "mb-10 sm:mb-12",
+        centered && "text-center mx-auto max-w-2xl",
+        className,
+      )}
+    >
+      {eyebrow ? (
+        <p className={hpCn(hp.eyebrow, centered && "justify-center")}>{eyebrow}</p>
       ) : null}
-      <h1 className={`text-3xl sm:text-4xl lg:text-[2.75rem] font-bold mb-3 font-display leading-[1.12] tracking-tight ${centered ? "mx-auto max-w-3xl" : "max-w-2xl"}`}>
+      <h1 className={hpCn(hp.display, "text-3xl sm:text-4xl mt-3 tracking-tight")}>
         {title}
       </h1>
       {description ? (
-        <div className={`text-muted-foreground text-base leading-relaxed ${centered ? "max-w-lg mx-auto" : "max-w-xl"}`}>
+        <div className={hpCn(hp.lead, "text-base sm:text-lg mt-3 leading-relaxed", centered ? "mx-auto max-w-lg" : hp.copyWide)}>
           {description}
         </div>
       ) : null}
-    </div>
+    </header>
   );
 }

@@ -108,6 +108,13 @@ export interface AnalyticsDashboard {
   activeUsersNow: number;
   sessionsToday: number;
   pageViewsToday: number;
+  pageViewsPeriod: number;
+  sessionsPeriod: number;
+  visitTotals: { d7: number; d30: number; d90: number };
+  sessionTotals: { d7: number; d30: number; d90: number };
+  visitorBreakdown?: { guest: number; user: number; bot: number };
+  topGuestPages?: { path: string; views: number }[];
+  acquisitionFunnel?: { landing: number; templates: number; pricing: number; auth: number; signups: number };
   errors24h: number;
   totalUsers: number;
   proUsers: number;
@@ -199,6 +206,7 @@ export function auditActionLabel(action: string): string {
     "user.status_change": "Account status changed",
     "user.password_reset_sent": "Password reset sent (admin)",
     "user.force_logout": "Forced logout",
+    "user.delete": "User deleted",
     "project.create": "Project created",
     "project.update": "Project updated",
     "project.delete": "Project deleted",

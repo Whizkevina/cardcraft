@@ -31,7 +31,12 @@ export function getUtmParams(): { utmSource?: string; utmCampaign?: string } {
   };
 }
 
-const SKIP_PATHS = ["/auth", "/forgot-password", "/reset-password"];
+const SKIP_PATHS = ["/forgot-password", "/reset-password"];
+
+export function hasAnalyticsConsent(): boolean {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem("cookie_consent") === "accepted";
+}
 
 export function shouldTrackPath(path: string): boolean {
   return !SKIP_PATHS.some(p => path.startsWith(p));

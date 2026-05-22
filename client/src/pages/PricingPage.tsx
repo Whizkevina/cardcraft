@@ -2,14 +2,18 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { useAuth } from "../components/AuthProvider";
 import { useQueryClient } from "@tanstack/react-query";
-import Navbar from "../components/Navbar";
 import { Button } from "@/components/ui/button";
+import { MarketingPageShell } from "@/components/marketing/MarketingPageShell";
+import { MarketingSection } from "@/components/marketing/MarketingSection";
 import { PageHeader } from "@/components/marketing/PageHeader";
 import { PricingCard } from "@/components/marketing/PricingCard";
+import { SurfaceCard } from "@/components/marketing/SurfaceCard";
+import { hp, hpCn } from "@/components/marketing/homeTokens";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { CheckCircle, Sparkles, Zap, Crown, Loader2, Lock } from "lucide-react";
 import { usePricingQuote } from "@/hooks/usePricingQuote";
+import { useCtaTracking } from "@/hooks/useTelemetry";
 
 const FREE_FEATURES = [
   "All free templates",
@@ -42,6 +46,7 @@ export default function PricingPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const { quote } = usePricingQuote();
+  const trackCta = useCtaTracking();
   const [paying, setPaying] = useState(false);
 
   const loadPaystackScript = (): Promise<void> => {
@@ -55,6 +60,7 @@ export default function PricingPage() {
   };
 
   const handleUpgrade = async () => {
+    trackCta("pricing_upgrade_pro");
     if (!user) {
       toast({ title: "Sign in first", description: "Create a free account to upgrade to Pro.", variant: "destructive" });
       return;
@@ -88,7 +94,7 @@ export default function PricingPage() {
             const data = await verifyRes.json();
             if (data.success) {
               qc.invalidateQueries({ queryKey: ["/api/auth/me"] });
-              toast({ title: "🎉 Welcome to Pro!", description: "Your account is now upgraded. Unlimited downloads, no watermark." });
+              toast({ title: "Welcome to Pro", description: "Unlimited downloads and no watermark are now active." });
             } else {
               toast({ title: "Payment received", description: "Verification pending. Refresh in a moment.", variant: "destructive" });
             }
@@ -107,25 +113,24 @@ export default function PricingPage() {
   };
 
   return (
-    <div className="min-h-screen">
-      <Navbar />
-      <main className="relative max-w-4xl mx-auto px-4 sm:px-6 py-14 section-glow">
+    <MarketingPageShell>
+      <MarketingSection spacing="default" tone="grid">
         <PageHeader
-          badge={{ icon: Sparkles, label: "Simple, honest pricing" }}
+          eyebrow="Pricing"
           title="Pay once. Use forever."
           description={
             <>
-              No subscriptions, no recurring fees. Pay {quote.proPrice.formatted} once and get unlimited access for life.
+              No subscriptions. One {quote.proPrice.formatted} payment unlocks Pro for life.
               {quote.approximate ? (
-                <span className="block text-xs mt-3" data-testid="pricing-fx-disclaimer">
-                  Price shown in {quote.currency} for your region. Checkout charges {quote.charge.formatted} via Paystack; your bank may apply its own exchange rate.
+                <span className="block text-xs mt-3 text-muted-foreground" data-testid="pricing-fx-disclaimer">
+                  Price shown in {quote.currency} for your region. Checkout charges {quote.charge.formatted} via Paystack.
                 </span>
               ) : null}
             </>
           }
         />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
           <PricingCard
             name="Free"
             price={quote.freePrice.formatted}
@@ -135,12 +140,12 @@ export default function PricingPage() {
             priceTestId="price-free"
             footer={
               !user ? (
-                <Link href="/auth">
-                  <Button variant="outline" className="w-full h-11">Get Started Free</Button>
+                <Link href="/auth" onClick={() => trackCta("pricing_get_started_free")}>
+                  <Button variant="outline" className={hpCn(hp.btnSecondary, "w-full")}>Get started free</Button>
                 </Link>
               ) : (
-                <Button variant="outline" className="w-full h-11" disabled>
-                  {isPro ? "Current: Pro Plan" : "Current Plan"}
+                <Button variant="outline" className={hpCn(hp.btnSecondary, "w-full")} disabled>
+                  {isPro ? "Current: Pro" : "Current plan"}
                 </Button>
               )
             }
@@ -149,36 +154,36 @@ export default function PricingPage() {
           <PricingCard
             name="Pro — Lifetime"
             price={quote.proPrice.formatted}
-            subtitle="Pay once, use forever. No subscription."
+            subtitle="One payment · no subscription"
             features={PRO_FEATURES}
             highlighted
             priceTestId="price-pro"
             badge={
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary text-primary-foreground text-xs font-bold shadow-premium">
-                <Crown size={10} /> Most Popular
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-wide">
+                <Crown size={10} /> Recommended
               </div>
             }
             footer={
               isPro ? (
-                <div className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary/15 border border-primary/30 text-primary text-sm font-medium">
-                  <Sparkles size={15} /> You're on Pro — all features unlocked
+                <div className="w-full flex items-center justify-center gap-2 py-3 rounded-lg hp-surface-inset text-sm font-medium text-gold">
+                  <Sparkles size={15} /> Pro active — all features unlocked
                 </div>
               ) : (
                 <>
                   <Button
                     onClick={handleUpgrade}
                     disabled={paying || isLoading}
-                    className="w-full gap-2 btn-gold h-11 text-sm font-semibold"
+                    className={hpCn(hp.btnPrimary, "w-full")}
                     data-testid="button-upgrade-pro"
                   >
                     {paying
-                      ? <><Loader2 size={15} className="animate-spin" /> Processing...</>
-                      : <><Zap size={15} /> Upgrade to Pro — {quote.proPrice.formatted}</>
+                      ? <><Loader2 size={15} className="animate-spin" /> Processing…</>
+                      : <><Zap size={15} /> Upgrade — {quote.proPrice.formatted}</>
                     }
                   </Button>
                   {!user && (
                     <p className="text-center text-xs text-muted-foreground mt-3">
-                      <Link href="/auth" className="text-primary hover:underline">Sign in</Link> to pay
+                      <Link href="/auth" className="text-gold hover:underline">Sign in</Link> to pay
                     </p>
                   )}
                 </>
@@ -187,18 +192,18 @@ export default function PricingPage() {
           />
         </div>
 
-        <div className="mt-12 text-center space-y-2">
-          <div className="flex flex-wrap items-center justify-center gap-6 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1.5"><Lock size={11} className="text-gold" /> Secured by Paystack</span>
-            <span className="flex items-center gap-1.5"><CheckCircle size={11} className="text-gold" /> Instant upgrade after payment</span>
-            <span className="flex items-center gap-1.5"><CheckCircle size={11} className="text-gold" /> No recurring charges</span>
+        <SurfaceCard variant="inset" className="mt-10 p-5 sm:p-6 max-w-2xl mx-auto text-center">
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-muted-foreground mb-3">
+            <span className="inline-flex items-center gap-1.5"><Lock size={11} className="text-gold" /> Secured by Paystack</span>
+            <span className="inline-flex items-center gap-1.5"><CheckCircle size={11} className="text-gold" /> Instant upgrade</span>
+            <span className="inline-flex items-center gap-1.5"><CheckCircle size={11} className="text-gold" /> No recurring charges</span>
           </div>
-          <p className="text-xs text-muted-foreground pt-2">
-            Pay with Mastercard, Visa, Verve, bank transfer, or USSD.
-            Questions? Contact <a href="mailto:support@cardcraft.app" className="text-primary hover:underline">support@cardcraft.app</a>
+          <p className={hpCn(hp.lead, "text-xs")}>
+            Pay with card, bank transfer, or USSD. Questions?{" "}
+            <a href="mailto:support@cardcraft.app" className="text-gold hover:underline">support@cardcraft.app</a>
           </p>
-        </div>
-      </main>
-    </div>
+        </SurfaceCard>
+      </MarketingSection>
+    </MarketingPageShell>
   );
 }

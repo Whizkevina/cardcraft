@@ -19,6 +19,62 @@ function periodStart(period: Period): Date {
   return new Date(Date.now() - periodDays(period) * 24 * 60 * 60 * 1000);
 }
 
+async function countPageViewsSince(since: Date): Promise<number> {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(schema.analyticsEvents)
+    .where(and(
+      gte(schema.analyticsEvents.createdAt, since),
+      eq(schema.analyticsEvents.eventType, "page_view"),
+    ));
+  return row?.count ?? 0;
+}
+
+async function countUniqueSessionsSince(since: Date): Promise<number> {
+  const [row] = await db
+    .select({ count: sql<number>`count(distinct ${schema.analyticsSessions.sessionKey})::int` })
+    .from(schema.analyticsSessions)
+    .where(gte(schema.analyticsSessions.startedAt, since));
+  return row?.count ?? 0;
+}
+
+const visitorTypeExpr = sql<string>`coalesce(${schema.analyticsEvents.meta}::json->>'visitorType', case when ${schema.analyticsEvents.userId} is not null and ${schema.analyticsEvents.userId} > 0 then 'user' else 'guest' end)`;
+
+async function getVisitorBreakdown(since: Date): Promise<{ guest: number; user: number; bot: number }> {
+  const rows = await db
+    .select({
+      type: visitorTypeExpr,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(schema.analyticsEvents)
+    .where(and(
+      gte(schema.analyticsEvents.createdAt, since),
+      eq(schema.analyticsEvents.eventType, "page_view"),
+    ))
+    .groupBy(visitorTypeExpr);
+
+  const result = { guest: 0, user: 0, bot: 0 };
+  for (const row of rows) {
+    if (row.type === "bot") result.bot += row.count;
+    else if (row.type === "user") result.user += row.count;
+    else result.guest += row.count;
+  }
+  return result;
+}
+
+async function countGuestPathViews(since: Date, pathCondition: ReturnType<typeof sql>): Promise<number> {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(schema.analyticsEvents)
+    .where(and(
+      gte(schema.analyticsEvents.createdAt, since),
+      eq(schema.analyticsEvents.eventType, "page_view"),
+      sql`${visitorTypeExpr} = 'guest'`,
+      pathCondition,
+    ));
+  return row?.count ?? 0;
+}
+
 export async function getAnalyticsDashboard(period: Period = "7d") {
   const start = periodStart(period);
   const today = new Date().toISOString().split("T")[0];
@@ -152,11 +208,78 @@ export async function getAnalyticsDashboard(period: Period = "7d") {
     paid: Number(base.proUsers),
   };
 
+  const [pageViewsPeriodRow, sessionsPeriodRow] = await Promise.all([
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(schema.analyticsEvents)
+      .where(and(
+        gte(schema.analyticsEvents.createdAt, start),
+        eq(schema.analyticsEvents.eventType, "page_view"),
+      ))
+      .then(rows => rows[0]),
+    db
+      .select({ count: sql<number>`count(distinct ${schema.analyticsSessions.sessionKey})::int` })
+      .from(schema.analyticsSessions)
+      .where(gte(schema.analyticsSessions.startedAt, start))
+      .then(rows => rows[0]),
+  ]);
+
+  const visitTotals = {
+    d7: await countPageViewsSince(periodStart("7d")),
+    d30: await countPageViewsSince(periodStart("30d")),
+    d90: await countPageViewsSince(periodStart("90d")),
+  };
+
+  const sessionTotals = {
+    d7: await countUniqueSessionsSince(periodStart("7d")),
+    d30: await countUniqueSessionsSince(periodStart("30d")),
+    d90: await countUniqueSessionsSince(periodStart("90d")),
+  };
+
+  const [visitorBreakdown, topGuestPages, periodSignups] = await Promise.all([
+    getVisitorBreakdown(start),
+    db
+      .select({
+        path: schema.analyticsEvents.pagePath,
+        views: sql<number>`count(*)::int`,
+      })
+      .from(schema.analyticsEvents)
+      .where(and(
+        gte(schema.analyticsEvents.createdAt, start),
+        eq(schema.analyticsEvents.eventType, "page_view"),
+        sql`${visitorTypeExpr} = 'guest'`,
+        sql`${schema.analyticsEvents.pagePath} IS NOT NULL`,
+      ))
+      .groupBy(schema.analyticsEvents.pagePath)
+      .orderBy(desc(sql`count(*)`))
+      .limit(10),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(schema.users)
+      .where(gte(schema.users.createdAt, start))
+      .then(rows => rows[0]?.count ?? 0),
+  ]);
+
+  const acquisitionFunnel = {
+    landing: await countGuestPathViews(start, sql`(${schema.analyticsEvents.pagePath} = '/' OR ${schema.analyticsEvents.pagePath} = '' OR ${schema.analyticsEvents.pagePath} IS NULL)`),
+    templates: await countGuestPathViews(start, sql`${schema.analyticsEvents.pagePath} LIKE '/templates%'`),
+    pricing: await countGuestPathViews(start, sql`${schema.analyticsEvents.pagePath} = '/pricing'`),
+    auth: await countGuestPathViews(start, sql`${schema.analyticsEvents.pagePath} = '/auth'`),
+    signups: periodSignups,
+  };
+
   return {
     period,
     activeUsersNow: activeSessions.length,
     sessionsToday: sessionsToday?.count ?? 0,
     pageViewsToday: pageViewsToday?.count ?? 0,
+    pageViewsPeriod: pageViewsPeriodRow?.count ?? 0,
+    sessionsPeriod: sessionsPeriodRow?.count ?? 0,
+    visitTotals,
+    sessionTotals,
+    visitorBreakdown,
+    topGuestPages: topGuestPages.filter(p => p.path).map(p => ({ path: p.path!, views: p.views })),
+    acquisitionFunnel,
     errors24h: getServerErrors24h(),
     ...base,
     ops,

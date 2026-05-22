@@ -1,9 +1,11 @@
 import { useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
-import { getUtmParams, parseClientUserAgent, shouldTrackPath } from "@/lib/telemetry";
+import { useAuth } from "@/components/AuthProvider";
+import { getUtmParams, hasAnalyticsConsent, parseClientUserAgent, shouldTrackPath } from "@/lib/telemetry";
 
 interface UseTelemetryOptions {
+  /** Logged-in user id — always tracked when present. */
   userId: number | null | undefined;
 }
 
@@ -11,9 +13,11 @@ export function useTelemetry({ userId }: UseTelemetryOptions) {
   const [location] = useLocation();
   const lastPath = useRef<string | null>(null);
   const ua = parseClientUserAgent();
+  const isLoggedIn = userId != null && userId > 0;
+  const canTrack = isLoggedIn || hasAnalyticsConsent();
 
   useEffect(() => {
-    if (!userId) return;
+    if (!canTrack) return;
 
     const sendHeartbeat = () => {
       if (!shouldTrackPath(location)) return;
@@ -28,10 +32,10 @@ export function useTelemetry({ userId }: UseTelemetryOptions) {
     sendHeartbeat();
     const interval = setInterval(sendHeartbeat, 60_000);
     return () => clearInterval(interval);
-  }, [userId, location, ua.browser, ua.os, ua.deviceType]);
+  }, [canTrack, location, ua.browser, ua.os, ua.deviceType]);
 
   useEffect(() => {
-    if (!userId || !shouldTrackPath(location)) return;
+    if (!canTrack || !shouldTrackPath(location)) return;
     if (lastPath.current === location) return;
     lastPath.current = location;
 
@@ -41,11 +45,11 @@ export function useTelemetry({ userId }: UseTelemetryOptions) {
       referrer: document.referrer || undefined,
       ...ua,
     }).catch(() => {});
-  }, [userId, location, ua.browser, ua.os, ua.deviceType]);
+  }, [canTrack, location, ua.browser, ua.os, ua.deviceType]);
 }
 
 export function trackFeatureEvent(
-  eventType: "feature_click" | "conversion" | "download" | "share_create" | "bulk_generate" | "bulk_download",
+  eventType: "feature_click" | "conversion" | "download" | "share_create" | "bulk_generate" | "bulk_download" | "cta_click",
   payload: {
     pagePath?: string;
     action?: string;
@@ -65,4 +69,26 @@ export function trackFeatureEvent(
     referrer: document.referrer || undefined,
     ...ua,
   });
+}
+
+/** Track marketing CTA taps (e.g. “Get started”, “Browse templates”). */
+export function trackCtaClick(action: string, meta?: Record<string, unknown>) {
+  return trackFeatureEvent("cta_click", {
+    action,
+    meta,
+    pagePath: typeof window !== "undefined"
+      ? window.location.hash.replace(/^#/, "") || "/"
+      : "/",
+  });
+}
+
+/** Hook — respects cookie consent for guests; always tracks for signed-in users. */
+export function useCtaTracking() {
+  const { user } = useAuth();
+
+  return (action: string, meta?: Record<string, unknown>) => {
+    if (localStorage.getItem("cookie_consent") === "declined") return;
+    if (!user && !hasAnalyticsConsent()) return;
+    trackCtaClick(action, meta).catch(() => {});
+  };
 }

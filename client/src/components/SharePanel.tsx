@@ -12,6 +12,7 @@ import { trackFeatureEvent } from "@/hooks/useTelemetry";
 import { useAuth } from "./AuthProvider";
 import { apiRequest } from "@/lib/queryClient";
 import { applySvgTextMode, type SvgTextMode } from "@/lib/svgTextExport";
+import { prepareCanvasForExport } from "@/lib/fabricTextFix";
 import { Download, Share2, Copy, Link, Sparkles, Lock, QrCode, Mail, Loader2 } from "lucide-react";
 
 const EXPORT_PRESETS = [
@@ -96,8 +97,17 @@ export function SharePanel({ fabricRef, projectTitle, projectId, onQROpen, svgTe
     const f = (window as any).fabric;
     const currentZoom = canvas.getZoom();
     canvas.setZoom(1);
+    prepareCanvasForExport(canvas);
     const wm = applyWatermark(canvas, f);
-    const dataURL = canvas.toDataURL({ format, quality: 0.95, multiplier });
+    let dataURL: string;
+    try {
+      dataURL = canvas.toDataURL({ format, quality: 0.95, multiplier });
+    } catch (err) {
+      console.error("[SharePanel] PNG/JPG export failed:", err);
+      removeWatermark(canvas, wm);
+      canvas.setZoom(currentZoom);
+      return null;
+    }
     removeWatermark(canvas, wm);
     canvas.setZoom(currentZoom);
     return dataURL;
@@ -111,6 +121,7 @@ export function SharePanel({ fabricRef, projectTitle, projectId, onQROpen, svgTe
     const f = (window as any).fabric;
     const currentZoom = canvas.getZoom();
     canvas.setZoom(1);
+    prepareCanvasForExport(canvas);
     const wm = applyWatermark(canvas, f);
     try {
       const width = Math.round(canvas.width * preset.multiplier);
@@ -140,7 +151,10 @@ export function SharePanel({ fabricRef, projectTitle, projectId, onQROpen, svgTe
     if (!allowed) return;
 
     const dataURL = getExportDataURL(format);
-    if (!dataURL) return;
+    if (!dataURL) {
+      toast({ title: "Export failed", description: "Could not generate the image. Try refreshing and exporting again.", variant: "destructive" });
+      return;
+    }
 
     const a = document.createElement("a");
     a.href = dataURL;
@@ -158,7 +172,10 @@ export function SharePanel({ fabricRef, projectTitle, projectId, onQROpen, svgTe
     if (!allowed) return;
 
     const svg = await getExportSVG();
-    if (!svg) return;
+    if (!svg) {
+      toast({ title: "Export failed", description: "Could not generate SVG. Try refreshing and exporting again.", variant: "destructive" });
+      return;
+    }
 
     const a = document.createElement("a");
     a.href = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;

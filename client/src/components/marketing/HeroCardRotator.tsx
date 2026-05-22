@@ -15,9 +15,10 @@ function pickRandomIndex(length: number, exclude: number): number {
 
 interface HeroCardRotatorProps {
   templates: Template[];
+  showCaption?: boolean;
 }
 
-export function HeroCardRotator({ templates }: HeroCardRotatorProps) {
+export function HeroCardRotator({ templates, showCaption = true }: HeroCardRotatorProps) {
   const pool = useMemo(
     () => templates.filter((t) => t.previewImage || t.thumbnailColor),
     [templates],
@@ -100,8 +101,9 @@ export function HeroCardRotator({ templates }: HeroCardRotatorProps) {
         className={cn(
           "text-center text-xs text-muted-foreground mt-3 transition-opacity duration-300",
           titleVisible ? "opacity-100" : "opacity-0",
+          !showCaption && "sr-only",
         )}
-        aria-live="polite"
+        aria-live={showCaption ? "polite" : "off"}
       >
         {current.title} — fully customizable
       </p>

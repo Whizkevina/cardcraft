@@ -7,6 +7,7 @@ export type Permission =
   | "users:write"
   | "users:role"
   | "users:impersonate"
+  | "users:delete"
   | "payments:read"
   | "payments:write"
   | "projects:moderate"
@@ -17,7 +18,7 @@ export type Permission =
 const ROLE_PERMISSIONS: Record<StaffRole, Permission[]> = {
   admin: [
     "analytics:read", "audit:read", "users:read", "users:write", "users:role",
-    "users:impersonate", "payments:read", "payments:write", "projects:moderate",
+    "users:impersonate", "users:delete", "payments:read", "payments:write", "projects:moderate",
     "templates:read", "templates:write", "settings:write",
   ],
   support: [

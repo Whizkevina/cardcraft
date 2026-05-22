@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 
 import { useToast } from "@/hooks/use-toast";
 
-import { Users, TrendingUp, CreditCard, LayoutTemplate, Pencil, ScrollText, FolderOpen, Shield, Plus, Eye, EyeOff, Trash2 } from "lucide-react";
+import { Users, TrendingUp, CreditCard, LayoutTemplate, Pencil, ScrollText, FolderOpen, Shield, Plus, Eye, EyeOff, Trash2, Search } from "lucide-react";
 
 import { Link } from "wouter";
 
@@ -57,8 +57,7 @@ import type { AdminUser } from "@/components/admin/types";
 
 
 const tabTriggerClass =
-
-  "rounded-none border-b-2 border-transparent px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-medium text-muted-foreground shadow-none transition-colors data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none";
+  "rounded-none border-b-2 border-transparent px-3 py-2 text-xs font-medium text-muted-foreground shadow-none transition-colors data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none";
 
 
 
@@ -212,7 +211,7 @@ function CreateTemplateDialog({ onCreated }: { onCreated: () => void }) {
 
       <DialogTrigger asChild>
 
-        <Button className="gap-2 h-10 px-4" data-testid="button-create-template">
+        <Button className="gap-2 h-9 px-3 text-xs" data-testid="button-create-template">
 
           <Plus size={15} /> New Template
 
@@ -277,6 +276,8 @@ export default function AdminPage() {
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
 
   const [detailOpen, setDetailOpen] = useState(false);
+
+  const [templateSearch, setTemplateSearch] = useState("");
 
 
 
@@ -366,6 +367,90 @@ export default function AdminPage() {
 
   });
 
+  const deleteUser = useMutation({
+
+    mutationFn: async (id: number) => {
+
+      const r = await apiRequest("DELETE", `/api/admin/users/${id}`);
+
+      if (!r.ok) {
+
+        const body = await r.json().catch(() => ({}));
+
+        throw new Error(body.error || "Failed to delete user");
+
+      }
+
+    },
+
+    onSuccess: (_, id) => {
+
+      qc.invalidateQueries({ queryKey: ["/api/admin/users"] });
+
+      qc.invalidateQueries({ queryKey: ["/api/admin/audit-log"] });
+
+      qc.invalidateQueries({ queryKey: ["/api/admin/analytics/dashboard"] });
+
+      setDetailOpen(false);
+
+      setSelectedUser(null);
+
+      toast({ title: "User deleted" });
+
+    },
+
+    onError: (e: Error) => toast({ title: "Delete failed", description: e.message, variant: "destructive" }),
+
+  });
+
+  const bulkDeleteUsers = useMutation({
+
+    mutationFn: async (ids: number[]) => {
+
+      const r = await apiRequest("POST", "/api/admin/users/bulk-delete", { ids });
+
+      if (!r.ok) throw new Error("Bulk delete failed");
+
+      return r.json() as Promise<{ deleted: number; failed: { id: number; reason: string }[] }>;
+
+    },
+
+    onSuccess: (result) => {
+
+      qc.invalidateQueries({ queryKey: ["/api/admin/users"] });
+
+      qc.invalidateQueries({ queryKey: ["/api/admin/audit-log"] });
+
+      qc.invalidateQueries({ queryKey: ["/api/admin/analytics/dashboard"] });
+
+      const skipped = result.failed.length;
+
+      toast({
+
+        title: `${result.deleted} user${result.deleted !== 1 ? "s" : ""} deleted`,
+
+        description: skipped > 0 ? `${skipped} skipped (admin, self, or not found)` : undefined,
+
+      });
+
+    },
+
+    onError: () => toast({ title: "Bulk delete failed", variant: "destructive" }),
+
+  });
+
+  const canDeleteUsers = user?.role === "admin";
+
+  const filteredTemplates = templates.filter(t => {
+
+    if (!templateSearch.trim()) return true;
+
+    const q = templateSearch.toLowerCase();
+
+    return t.title.toLowerCase().includes(q) || t.category.toLowerCase().includes(q);
+
+  });
+
 
 
   const seedAdmin = async () => {
@@ -442,13 +527,13 @@ export default function AdminPage() {
 
       <Navbar />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-5 lg:px-6 py-5 sm:py-6">
 
         <AdminPageHeader
 
           title="Admin Panel"
 
-          description="Monitor growth, manage users, review payments, and curate templates."
+          description="Growth, users, payments, and templates."
 
           action={<CreateTemplateDialog onCreated={() => {}} />}
 
@@ -522,11 +607,17 @@ export default function AdminPage() {
 
               currentUserId={user.id}
 
+              canDelete={canDeleteUsers}
+
               onSelect={(u) => { setSelectedUser(u); setDetailOpen(true); }}
 
               onTierChange={(id, tier) => changeTier.mutate({ id, tier })}
 
               onRoleChange={(id, role) => changeRole.mutate({ id, role })}
+
+              onBulkDelete={ids => bulkDeleteUsers.mutate(ids)}
+
+              deletePending={deleteUser.isPending || bulkDeleteUsers.isPending}
 
             />
 
@@ -562,7 +653,7 @@ export default function AdminPage() {
 
             <AdminPanel padding="none">
 
-              <div className="px-4 sm:px-5 pt-4 sm:pt-5 pb-3 border-b border-border/60">
+              <div className="px-4 sm:px-5 pt-4 sm:pt-5 pb-3 border-b border-border/60 space-y-4">
 
                 <AdminSectionHeader
 
@@ -571,6 +662,26 @@ export default function AdminPage() {
                   description={`${templates.length} templates · publish, edit, or remove designs`}
 
                 />
+
+                <div className="relative">
+
+                  <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+
+                  <Input
+
+                    placeholder="Search templates by title or category…"
+
+                    value={templateSearch}
+
+                    onChange={e => setTemplateSearch(e.target.value)}
+
+                    className="pl-10 h-10 text-sm bg-secondary/20 border-border/70"
+
+                    data-testid="input-template-search"
+
+                  />
+
+                </div>
 
               </div>
 
@@ -584,9 +695,13 @@ export default function AdminPage() {
 
                 <div className="py-12 text-center text-sm text-muted-foreground">No templates yet.</div>
 
+              ) : filteredTemplates.length === 0 ? (
+
+                <div className="py-12 text-center text-sm text-muted-foreground">No templates match your search.</div>
+
               ) : (
 
-                templates.map(t => (
+                filteredTemplates.map(t => (
 
                   <TemplateRow
 
@@ -631,6 +746,12 @@ export default function AdminPage() {
           onTierChange={(id, tier, reason, proExpiresAt) => changeTier.mutate({ id, tier, reason, proExpiresAt })}
 
           onRoleChange={(id, role) => changeRole.mutate({ id, role })}
+
+          canDelete={canDeleteUsers}
+
+          onDelete={id => deleteUser.mutate(id)}
+
+          deletePending={deleteUser.isPending}
 
         />
 

@@ -4,6 +4,7 @@ import { type Server } from "http";
 import viteConfig from "../vite.config";
 import fs from "fs";
 import path from "path";
+import { injectSiteMeta, resolveAppUrl } from "./siteMeta";
 import { nanoid } from "nanoid";
 
 const viteLogger = createLogger();
@@ -44,6 +45,7 @@ export async function setupVite(server: Server, app: Express) {
 
       // always reload the index.html file from disk incase it changes
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
+      template = injectSiteMeta(template, resolveAppUrl());
       template = template.replace(
         `src="/src/main.tsx"`,
         `src="/src/main.tsx?v=${nanoid()}"`,

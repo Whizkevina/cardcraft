@@ -2,12 +2,15 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "../components/AuthProvider";
-import Navbar from "../components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
+import { MarketingPageShell } from "@/components/marketing/MarketingPageShell";
+import { MarketingSection } from "@/components/marketing/MarketingSection";
+import { AppPageHeader } from "@/components/marketing/AppPageHeader";
 import { EmptyState } from "@/components/marketing/EmptyState";
+import { hp, hpCn } from "@/components/marketing/homeTokens";
 import { FolderOpen, Edit3, Trash2, Plus, Clock, Copy, Check, Pencil } from "lucide-react";
 import type { Project } from "@shared/schema";
 import { format } from "date-fns";
@@ -49,10 +52,9 @@ function ProjectCard({ project, onDelete, onDuplicate }: {
   });
 
   return (
-    <div className="group rounded-xl overflow-hidden border border-border bg-card hover:border-primary/30 transition-colors" data-testid={`card-project-${project.id}`}>
-      {/* Thumbnail */}
+    <div className={hpCn(hp.surface.raised, "group rounded-xl overflow-hidden hover:border-primary/25 transition-colors")} data-testid={`card-project-${project.id}`}>
       <div
-        className="aspect-[4/5] bg-secondary cursor-pointer relative overflow-hidden"
+        className="aspect-[4/5] bg-secondary/50 cursor-pointer relative overflow-hidden"
         onClick={() => { window.location.hash = `#/editor/p/${project.id}`; }}
       >
         {project.thumbnail ? (
@@ -69,9 +71,7 @@ function ProjectCard({ project, onDelete, onDuplicate }: {
         </div>
       </div>
 
-      {/* Footer */}
       <div className="p-3">
-        {/* Inline rename */}
         {renaming ? (
           <div className="flex items-center gap-1.5 mb-1">
             <Input
@@ -83,7 +83,7 @@ function ProjectCard({ project, onDelete, onDuplicate }: {
               data-testid={`input-rename-${project.id}`}
             />
             <button onClick={() => renameMutation.mutate(title)} className="p-1 rounded hover:bg-secondary text-primary">
-              {saved ? <Check size={13} /> : <Check size={13} />}
+              <Check size={13} />
             </button>
           </div>
         ) : (
@@ -108,14 +108,14 @@ function ProjectCard({ project, onDelete, onDuplicate }: {
         <div className="flex items-center gap-1">
           <button
             onClick={() => { window.location.hash = `#/editor/p/${project.id}`; }}
-            className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded text-xs bg-secondary hover:bg-secondary/70 text-muted-foreground hover:text-foreground transition-colors"
+            className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded text-xs bg-secondary/80 hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
             data-testid={`button-edit-project-${project.id}`}
           >
             <Edit3 size={11} /> Edit
           </button>
           <button
             onClick={() => onDuplicate(project.id)}
-            className="flex items-center justify-center gap-1 py-1.5 px-2.5 rounded text-xs bg-secondary hover:bg-secondary/70 text-muted-foreground hover:text-foreground transition-colors"
+            className="flex items-center justify-center gap-1 py-1.5 px-2.5 rounded text-xs bg-secondary/80 hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
             title="Duplicate"
             data-testid={`button-duplicate-project-${project.id}`}
           >
@@ -172,43 +172,44 @@ export default function Projects() {
 
   if (!user) {
     return (
-      <div className="min-h-screen">
-        <Navbar />
-        <EmptyState
-          icon={FolderOpen}
-          title="Sign in to save cards"
-          description="Create a free account to save and revisit your designs."
-          actions={[
-            { label: "Sign In / Register", href: "/auth" },
-            { label: "Browse Templates", href: "/templates", variant: "outline" },
-          ]}
-        />
-      </div>
+      <MarketingPageShell>
+        <MarketingSection spacing="default">
+          <EmptyState
+            icon={FolderOpen}
+            title="Sign in to save cards"
+            description="Create a free account to save and revisit your designs."
+            actions={[
+              { label: "Sign In / Register", href: "/auth" },
+              { label: "Browse Templates", href: "/templates", variant: "outline" },
+            ]}
+          />
+        </MarketingSection>
+      </MarketingPageShell>
     );
   }
 
   return (
-    <div className="min-h-screen">
-      <Navbar />
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-2xl font-bold font-display">My Cards</h1>
-            <p className="text-muted-foreground text-sm">{projects.length} saved {projects.length === 1 ? "card" : "cards"}</p>
-          </div>
-          <Link href="/templates">
-            <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90" data-testid="button-new-card">
-              <Plus size={15} /> New Card
-            </Button>
-          </Link>
-        </div>
+    <MarketingPageShell>
+      <MarketingSection spacing="default" containerClassName="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <AppPageHeader
+          eyebrow="Your workspace"
+          title="My Cards"
+          description={`${projects.length} saved ${projects.length === 1 ? "card" : "cards"}`}
+          action={
+            <Link href="/templates">
+              <Button className={hp.btnPrimary} data-testid="button-new-card">
+                <Plus size={15} /> New Card
+              </Button>
+            </Link>
+          }
+        />
 
         {isLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {[1,2,3,4].map(i => (
-              <div key={i} className="rounded-xl overflow-hidden border border-border">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className={hpCn(hp.surface.base, "rounded-xl overflow-hidden")}>
                 <div className="aspect-[4/5] skeleton" />
-                <div className="p-3 bg-card space-y-2">
+                <div className="p-3 space-y-2">
                   <div className="skeleton h-3 w-28" /><div className="skeleton h-3 w-20" />
                 </div>
               </div>
@@ -227,7 +228,7 @@ export default function Projects() {
             ))}
           </div>
         )}
-      </main>
-    </div>
+      </MarketingSection>
+    </MarketingPageShell>
   );
 }

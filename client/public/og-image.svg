@@ -28,8 +28,8 @@
   <text x="400" y="260" font-family="Georgia,serif" font-size="78" font-weight="bold" fill="#E8D8A0">CardCraft</text>
   <rect x="400" y="278" width="520" height="4" rx="2" fill="url(#ul)"/>
   <!-- Tagline -->
-  <text x="400" y="330" font-family="Georgia,serif" font-size="32" fill="rgba(232,216,160,0.7)">Design beautiful cards in minutes.</text>
-  <text x="400" y="375" font-family="Arial,sans-serif" font-size="24" fill="rgba(232,216,160,0.45)">20 templates · Photo upload · Download in HD</text>
+  <text x="400" y="330" font-family="Georgia,serif" font-size="32" fill="rgba(232,216,160,0.7)">Cards worth sending. Built in minutes.</text>
+  <text x="400" y="375" font-family="Arial,sans-serif" font-size="24" fill="rgba(232,216,160,0.45)">Templates · Portrait upload · Print-ready export</text>
   <!-- CTA -->
   <rect x="400" y="430" width="320" height="56" rx="12" fill="#C9A84C"/>
   <text x="560" y="465" font-family="Arial,sans-serif" font-size="22" font-weight="bold" fill="#1a1208" text-anchor="middle">Start Designing — Free</text>

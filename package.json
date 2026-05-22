@@ -14,6 +14,7 @@
     "db:seed-love": "tsx script/add-love-templates.ts",
     "db:seed-admin": "tsx script/seed-admin.ts",
     "db:previews": "tsx script/generate-template-previews.ts",
+    "og:generate": "tsx script/generate-og-image.ts",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
     "test:e2e": "playwright test",

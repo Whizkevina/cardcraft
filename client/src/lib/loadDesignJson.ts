@@ -1,3 +1,5 @@
+import { normalizeCanvasTextObjects, sanitizeFabricJsonData } from "./fabricTextFix";
+
 /** Layout math for fitting source canvas dimensions into display bounds */
 export function computeCanvasLayout(
   srcWidth: number,
@@ -36,15 +38,7 @@ export interface DesignJsonData {
 
 export function parseDesignJson(designJson: string): DesignJsonData {
   const data = JSON.parse(designJson) as DesignJsonData;
-
-  if (data.objects) {
-    for (const obj of data.objects) {
-      if (obj.textBaseline === "alphabetical") {
-        obj.textBaseline = "alphabetic";
-      }
-    }
-  }
-
+  sanitizeFabricJsonData(data);
   return data;
 }
 
@@ -232,10 +226,15 @@ export async function loadDesignJson(
       addToCanvas(new f.Triangle(s));
     } else if (obj.type === "text" || obj.type === "i-text" || obj.type === "textbox") {
       const textS = { ...s };
+      delete textS.type;
       if (obj.fillGradient) {
         textS.fill = obj.fillGradient.colorStops?.[1]?.color || "#f09820";
       }
-      const textObj = new f.IText(obj.text ?? "", { ...textS, type: undefined });
+      const textObj = new f.IText(obj.text ?? "", {
+        ...textS,
+        fontFamily: textS.fontFamily || "Georgia",
+        textBaseline: "alphabetic",
+      });
       addToCanvas(textObj);
 
       if (obj.fillGradient) {
@@ -264,6 +263,7 @@ export async function loadDesignJson(
 
   await Promise.all(pendingImages);
   await Promise.all(gradientTimers);
+  normalizeCanvasTextObjects(canvas);
   canvas.renderAll();
 
   return layout;

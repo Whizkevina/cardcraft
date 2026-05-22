@@ -317,6 +317,46 @@ export class Storage {
     return result.rowCount ?? 0;
   }
 
+  /** Permanently delete a user and their projects, payments, sessions, and analytics rows. */
+  async deleteUser(id: number): Promise<boolean> {
+    const user = await this.getUser(id);
+    if (!user) return false;
+
+    const pool = getPgPool();
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query('DELETE FROM projects WHERE user_id = $1', [id]);
+      await client.query('DELETE FROM payments WHERE user_id = $1', [id]);
+      await client.query('DELETE FROM analytics_events WHERE user_id = $1', [id]);
+      await client.query('DELETE FROM analytics_sessions WHERE user_id = $1', [id]);
+      await client.query(`DELETE FROM session WHERE sess->>'userId' = $1`, [String(id)]);
+      const result = await client.query('DELETE FROM users WHERE id = $1', [id]);
+      await client.query("COMMIT");
+      return (result.rowCount ?? 0) > 0;
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  async deleteUsers(ids: number[]): Promise<{ deleted: number; failed: { id: number; reason: string }[] }> {
+    const failed: { id: number; reason: string }[] = [];
+    let deleted = 0;
+    for (const id of ids) {
+      try {
+        const ok = await this.deleteUser(id);
+        if (ok) deleted++;
+        else failed.push({ id, reason: "not_found" });
+      } catch {
+        failed.push({ id, reason: "error" });
+      }
+    }
+    return { deleted, failed };
+  }
+
   async updatePaymentRefundNote(id: number, refundNote: string | null): Promise<Payment | undefined> {
     const [payment] = await getDb().update(schema.payments).set({ refundNote }).where(eq(schema.payments.id, id)).returning();
     return payment;
@@ -777,10 +817,10 @@ export class Storage {
   async upsertAnalyticsSession(data: {
     sessionKey: string;
     userId: number;
-    userName: string;
-    userEmail: string;
+    userName?: string | null;
+    userEmail?: string | null;
     userRole: string;
-    userTier: string;
+    userTier?: string | null;
     pagePath?: string;
     referrer?: string;
     utmSource?: string;

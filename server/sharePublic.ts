@@ -1,7 +1,8 @@
 import type { Request, Response } from "express";
 import type { Project } from "@shared/schema";
 import { storage } from "./storage";
-import { extractClientIp, hashIp } from "./auditUtils";
+import { extractClientIp, hashIp, parseUserAgent } from "./auditUtils";
+import { isLikelyBot, resolveVisitorType } from "./botDetection";
 
 function escapeHtml(str: string): string {
   return String(str)
@@ -68,15 +69,32 @@ export function registerSharePublicRoutes(app: import("express").Express) {
     }
 
     const ip = extractClientIp(req);
+    const ua = typeof req.headers["user-agent"] === "string" ? req.headers["user-agent"] : undefined;
+    const visitorType = resolveVisitorType(ua, false);
+    const parsedUa = parseUserAgent(ua);
     await storage.recordAnalyticsEvent({
-      eventType: "share_view",
+      eventType: "page_view",
       pagePath: `/share/${token.slice(0, 8)}…`,
       resourceType: "project",
       resourceId: project.id,
-      meta: { title: project.title, userId: project.userId },
+      meta: { title: project.title, userId: project.userId, visitorType, source: "share_html" },
       ipHash: hashIp(ip),
       referrer: typeof req.headers.referer === "string" ? req.headers.referer : undefined,
+      browser: parsedUa.browser,
+      os: parsedUa.os,
+      deviceType: parsedUa.deviceType,
     });
+    if (!isLikelyBot(ua)) {
+      await storage.recordAnalyticsEvent({
+        eventType: "share_view",
+        pagePath: `/share/${token.slice(0, 8)}…`,
+        resourceType: "project",
+        resourceId: project.id,
+        meta: { title: project.title, userId: project.userId, visitorType: "guest" },
+        ipHash: hashIp(ip),
+        referrer: typeof req.headers.referer === "string" ? req.headers.referer : undefined,
+      });
+    }
     await storage.logAuditEvent({
       actorRole: "guest",
       action: "share.view",

@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "../components/AuthProvider";
-import Navbar from "../components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -11,7 +10,13 @@ import { colorSwatchDataUri } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { trackFeatureEvent } from "@/hooks/useTelemetry";
 import { loadFabric } from "@/lib/loadFabric";
-import { Upload, Download, Layers, FileText, CheckCircle, XCircle, Loader2, Play } from "lucide-react";
+import { MarketingPageShell } from "@/components/marketing/MarketingPageShell";
+import { MarketingSection } from "@/components/marketing/MarketingSection";
+import { AppPageHeader } from "@/components/marketing/AppPageHeader";
+import { SurfaceCard } from "@/components/marketing/SurfaceCard";
+import { EmptyState } from "@/components/marketing/EmptyState";
+import { hp, hpCn } from "@/components/marketing/homeTokens";
+import { Upload, Download, Layers, FileText, CheckCircle, XCircle, Loader2, Play, Crown } from "lucide-react";
 import type { Template } from "@shared/schema";
 
 interface BulkRow {
@@ -91,7 +96,7 @@ export default function BulkGenerate() {
       let h = 1000;
       if (data.canvasWidth) w = data.canvasWidth;
       if (data.canvasHeight) h = data.canvasHeight;
-      
+
       const el = document.createElement("canvas");
       el.width = w;
       el.height = h;
@@ -109,10 +114,10 @@ export default function BulkGenerate() {
 
       canvas.loadFromJSON(data, async () => {
         const frameObj = canvas.getObjects().find((o: any) => o.customType === "photo_frame" || o.customType === "photo_image" || o.customType === "logo");
-        
+
         if (frameObj) {
           const frameIndex = canvas.getObjects().indexOf(frameObj);
-          
+
           if (row.image && row.image.startsWith("http")) {
             await new Promise<void>(res => {
               const imgElement = new Image();
@@ -122,7 +127,7 @@ export default function BulkGenerate() {
                 let clipPath: any = null;
                 const sizeW = frameObj.getScaledWidth();
                 const sizeH = frameObj.getScaledHeight();
-                
+
                 if (isCircle) {
                   clipPath = new f.Circle({ radius: Math.min(sizeW, sizeH) / 2, originX: "center", originY: "center" });
                 } else {
@@ -143,7 +148,7 @@ export default function BulkGenerate() {
                   clipPath,
                   customType: "photo_image"
                 });
-                
+
                 if (frameObj.customType === "photo_image") canvas.remove(frameObj);
                 canvas.add(fabricImg);
                 fabricImg.moveTo(frameIndex);
@@ -154,19 +159,18 @@ export default function BulkGenerate() {
               imgElement.src = row.image;
             });
           } else if (row.name) {
-            // Generate initials
             const words = row.name.trim().split(" ");
             let initials = (words[0] ? words[0][0] : "").toUpperCase();
             if (words.length > 1) initials += (words[words.length - 1] ? words[words.length - 1][0] : "").toUpperCase();
-            
+
             const center = frameObj.getCenterPoint();
             const sizeW = frameObj.getScaledWidth();
             const sizeH = frameObj.getScaledHeight();
             const size = Math.min(sizeW, sizeH);
-            
+
             const textObj = new f.Text(initials, {
               left: center.x,
-              top: center.y + (size * 0.05), // optical center alignment
+              top: center.y + (size * 0.05),
               originX: "center",
               originY: "center",
               fontSize: size * 0.45,
@@ -175,7 +179,7 @@ export default function BulkGenerate() {
               fontWeight: "600",
               textAlign: "center"
             });
-            
+
             canvas.add(textObj);
             textObj.moveTo(frameIndex + 1);
           }
@@ -185,7 +189,7 @@ export default function BulkGenerate() {
         setTimeout(() => {
           try {
             resolve(canvas.toDataURL({ format: "jpeg", quality: 1, multiplier: 2 }));
-          } catch(e) {
+          } catch (e) {
             reject(e);
           }
           canvas.dispose();
@@ -208,7 +212,7 @@ export default function BulkGenerate() {
       try {
         const dataUrl = await generateCard(rows[i], template);
         setRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: "done", dataUrl } : r));
-      } catch (err) {
+      } catch {
         setRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: "error" } : r));
       }
     }
@@ -248,46 +252,36 @@ export default function BulkGenerate() {
 
   if (!user || !isPro) {
     return (
-      <div className="min-h-screen">
-        <Navbar />
-        <main className="max-w-md mx-auto px-4 py-20 text-center">
-          <Layers size={40} className="mx-auto text-muted-foreground mb-4" />
-          <h2 className="text-xl font-bold mb-2">Pro feature</h2>
-          <p className="text-muted-foreground text-sm mb-6">
-            Bulk card generation is available on the Pro plan. Upgrade to generate personalized cards from CSV.
-          </p>
-          {!user ? (
-            <Link href="/auth"><Button className="bg-primary text-primary-foreground hover:bg-primary/90">Sign In</Button></Link>
-          ) : (
-            <Link href="/pricing"><Button className="bg-primary text-primary-foreground hover:bg-primary/90">Upgrade to Pro</Button></Link>
-          )}
-        </main>
-      </div>
+      <MarketingPageShell>
+        <MarketingSection spacing="default" containerClassName="max-w-lg mx-auto px-4 sm:px-6">
+          <EmptyState
+            icon={Layers}
+            title="Pro feature"
+            description="Bulk card generation is available on the Pro plan. Upgrade to generate personalized cards from CSV."
+            actions={
+              !user
+                ? [{ label: "Sign In", href: "/auth" }]
+                : [{ label: "Upgrade to Pro", href: "/pricing", icon: Crown }]
+            }
+          />
+        </MarketingSection>
+      </MarketingPageShell>
     );
   }
 
   return (
-    <div className="min-h-screen">
-      <Navbar />
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-10">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/15 border border-primary/30 text-xs font-medium text-gold mb-4">
-            <Layers size={11} /> Bulk Generation
-          </div>
-          <h1 className="text-2xl font-bold mb-2 font-display">
-            Generate Cards in Bulk
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            Upload a CSV with names and dates — CardCraft generates a personalized card for each row automatically.
-          </p>
-        </div>
+    <MarketingPageShell>
+      <MarketingSection spacing="default" containerClassName="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <AppPageHeader
+          eyebrow="Pro workflow"
+          title="Generate cards in bulk"
+          description="Upload a CSV with names and dates — CardCraft generates a personalized card for each row automatically."
+        />
 
-        {/* Step 1: Template */}
-        <div className="bg-card border border-border rounded-xl p-6 mb-4">
+        <SurfaceCard variant="raised" className="p-6 mb-4">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">1</div>
-            <h2 className="font-semibold text-sm">Select Template</h2>
+            <h2 className="font-semibold text-sm">Select template</h2>
           </div>
           <Select value={templateId} onValueChange={setTemplateId}>
             <SelectTrigger className="max-w-xs h-10" data-testid="select-template">
@@ -308,19 +302,18 @@ export default function BulkGenerate() {
               ))}
             </SelectContent>
           </Select>
-        </div>
+        </SurfaceCard>
 
-        {/* Step 2: CSV Upload */}
-        <div className="bg-card border border-border rounded-xl p-6 mb-4">
+        <SurfaceCard variant="raised" className="p-6 mb-4">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">2</div>
             <h2 className="font-semibold text-sm">Upload CSV</h2>
-            <button onClick={downloadSampleCSV} className="ml-auto text-xs text-primary hover:underline flex items-center gap-1">
+            <button onClick={downloadSampleCSV} className="ml-auto text-xs text-gold hover:underline flex items-center gap-1">
               <FileText size={12} /> Download sample CSV
             </button>
           </div>
 
-          <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
+          <div className={hpCn(hp.surface.inset, "border-2 border-dashed rounded-lg p-8 text-center")}>
             <Upload size={28} className="mx-auto text-muted-foreground mb-3" />
             <p className="text-sm text-muted-foreground mb-2">CSV with columns: <code className="bg-secondary px-1 py-0.5 rounded text-xs">name, greeting, date, subtitle</code></p>
             <label className="cursor-pointer">
@@ -333,18 +326,16 @@ export default function BulkGenerate() {
               <p className="mt-3 text-xs text-green-500 font-medium">{rows.length} rows loaded</p>
             )}
           </div>
-        </div>
+        </SurfaceCard>
 
-        {/* Step 3: Preview & Generate */}
         {rows.length > 0 && (
-          <div className="bg-card border border-border rounded-xl p-6 mb-4">
+          <SurfaceCard variant="raised" className="p-6 mb-4">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">3</div>
-              <h2 className="font-semibold text-sm">Preview & Generate</h2>
+              <h2 className="font-semibold text-sm">Preview & generate</h2>
               <span className="ml-auto text-xs text-muted-foreground">{doneCount}/{rows.length} done</span>
             </div>
 
-            {/* Table */}
             <div className="overflow-x-auto mb-4">
               <table className="w-full text-xs">
                 <thead>
@@ -370,7 +361,7 @@ export default function BulkGenerate() {
                       </td>
                       <td className="py-2 px-3">
                         {row.status === "done" && row.dataUrl && (
-                          <button onClick={() => downloadCard(row)} className="flex items-center gap-1 text-primary hover:underline" data-testid={`button-download-row-${i}`}>
+                          <button onClick={() => downloadCard(row)} className="flex items-center gap-1 text-gold hover:underline" data-testid={`button-download-row-${i}`}>
                             <Download size={10} /> Download
                           </button>
                         )}
@@ -388,21 +379,20 @@ export default function BulkGenerate() {
               <Button
                 onClick={generateAll}
                 disabled={generating || !templateId}
-                className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
+                className={hp.btnPrimary}
                 data-testid="button-generate-all"
               >
                 {generating ? <><Loader2 size={14} className="animate-spin" /> Generating...</> : <><Play size={14} /> Generate All ({rows.length})</>}
               </Button>
               {doneCount > 0 && (
-                <Button variant="outline" onClick={downloadAll} className="gap-2" data-testid="button-download-all">
+                <Button variant="outline" onClick={downloadAll} className={hp.btnSecondary} data-testid="button-download-all">
                   <Download size={14} /> Download All ({doneCount})
                 </Button>
               )}
             </div>
-          </div>
+          </SurfaceCard>
         )}
 
-        {/* Empty state */}
         {rows.length === 0 && (
           <div className="text-center py-10 text-muted-foreground text-sm">
             <Layers size={36} className="mx-auto mb-3 opacity-30" />
@@ -410,9 +400,8 @@ export default function BulkGenerate() {
           </div>
         )}
 
-        {/* Hidden canvas for generation */}
         <canvas ref={hiddenCanvasRef} className="hidden" />
-      </main>
-    </div>
+      </MarketingSection>
+    </MarketingPageShell>
   );
 }

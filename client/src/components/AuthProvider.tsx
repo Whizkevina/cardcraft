@@ -176,6 +176,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const user: AuthUser | null = data?.user ?? null;
   const impersonating = data?.impersonating ?? null;
   const staffRoles = ["admin", "support", "content"];
+  const [, setConsentTick] = useState(0);
+
+  useEffect(() => {
+    const sync = () => setConsentTick(t => t + 1);
+    window.addEventListener("cookie-consent-changed", sync);
+    return () => window.removeEventListener("cookie-consent-changed", sync);
+  }, []);
+
   useTelemetry({ userId: user?.id ?? null });
 
   const startImpersonation = async (userId: number) => {

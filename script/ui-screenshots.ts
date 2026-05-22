@@ -94,8 +94,8 @@ async function main() {
   await page.waitForLoadState("networkidle");
   await shot(page, "08-settings");
 
-  // Light theme sample
-  await page.getByTestId("button-theme-toggle").click();
+  // Light theme sample (via Settings → Appearance)
+  await page.getByTestId("button-theme-light").click();
   await page.goto(`${baseURL}/#/`);
   await page.waitForLoadState("networkidle");
   await shot(page, "09-landing-light");

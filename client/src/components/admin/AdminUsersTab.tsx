@@ -1,13 +1,18 @@
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import {
-  Search, Sparkles, Crown, Shield, ChevronRight, Ban, SlidersHorizontal, X, ChevronLeft,
+  Search, Sparkles, Crown, Shield, ChevronRight, Ban, SlidersHorizontal, X, ChevronLeft, Trash2,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { AdminPanel, AdminSectionHeader, UserAvatar } from "./AdminShell";
 import type { AdminUser } from "./types";
 import { isInactiveUser } from "./types";
@@ -18,20 +23,33 @@ interface AdminUsersTabProps {
   users: AdminUser[];
   usersLoading: boolean;
   currentUserId: number;
+  canDelete?: boolean;
   onSelect: (user: AdminUser) => void;
   onTierChange: (id: number, tier: "free" | "pro") => void;
   onRoleChange: (id: number, role: "user" | "admin") => void;
+  onBulkDelete?: (ids: number[]) => void;
+  deletePending?: boolean;
+}
+
+function canDeleteUser(user: AdminUser, currentUserId: number): boolean {
+  return user.id !== currentUserId && user.role !== "admin";
 }
 
 function UserRow({
   user,
   currentUserId,
+  canDelete,
+  selected,
+  onToggleSelect,
   onSelect,
   onTierChange,
   onRoleChange,
 }: {
   user: AdminUser;
   currentUserId: number;
+  canDelete: boolean;
+  selected: boolean;
+  onToggleSelect: (id: number, checked: boolean) => void;
   onSelect: (user: AdminUser) => void;
   onTierChange: (id: number, tier: "free" | "pro") => void;
   onRoleChange: (id: number, role: "user" | "admin") => void;
@@ -39,6 +57,7 @@ function UserRow({
   const isPro = user.tier === "pro";
   const isAdmin = user.role === "admin";
   const isSuspended = user.status === "suspended";
+  const deletable = canDelete && canDeleteUser(user, currentUserId);
 
   return (
     <div
@@ -49,6 +68,22 @@ function UserRow({
       role="button"
       tabIndex={0}
     >
+      {canDelete && (
+        <div
+          className="shrink-0"
+          onClick={e => e.stopPropagation()}
+          onKeyDown={e => e.stopPropagation()}
+        >
+          <Checkbox
+            checked={selected}
+            disabled={!deletable}
+            onCheckedChange={checked => onToggleSelect(user.id, checked === true)}
+            aria-label={`Select ${user.name}`}
+            data-testid={`checkbox-user-${user.id}`}
+          />
+        </div>
+      )}
+
       <UserAvatar name={user.name} />
 
       <div className="min-w-0 flex-1">
@@ -117,9 +152,12 @@ export function AdminUsersTab({
   users,
   usersLoading,
   currentUserId,
+  canDelete = false,
   onSelect,
   onTierChange,
   onRoleChange,
+  onBulkDelete,
+  deletePending = false,
 }: AdminUsersTabProps) {
   const [userSearch, setUserSearch] = useState("");
   const [tierFilter, setTierFilter] = useState("all");
@@ -131,8 +169,18 @@ export function AdminUsersTab({
   const [inactiveOnly, setInactiveOnly] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(0);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
 
   useEffect(() => { setPage(0); }, [userSearch, tierFilter, roleFilter, sortBy, atCapOnly, inactiveOnly, joinedFrom, joinedTo]);
+
+  useEffect(() => {
+    setSelectedIds(prev => {
+      const valid = new Set(users.map(u => u.id));
+      const next = prev.filter(id => valid.has(id));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [users]);
 
   const activeFilterCount = [
     tierFilter !== "all",
@@ -179,6 +227,25 @@ export function AdminUsersTab({
 
   const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
   const pagedUsers = filteredUsers.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+  const deletableOnPage = pagedUsers.filter(u => canDeleteUser(u, currentUserId));
+  const allPageSelected = deletableOnPage.length > 0 && deletableOnPage.every(u => selectedIds.includes(u.id));
+
+  const toggleSelect = (id: number, checked: boolean) => {
+    setSelectedIds(prev => {
+      if (checked) return prev.includes(id) ? prev : [...prev, id];
+      return prev.filter(x => x !== id);
+    });
+  };
+
+  const toggleSelectAllPage = (checked: boolean) => {
+    setSelectedIds(prev => {
+      const pageIds = deletableOnPage.map(u => u.id);
+      if (checked) {
+        return [...prev, ...pageIds.filter(id => !prev.includes(id))];
+      }
+      return prev.filter(id => !pageIds.includes(id));
+    });
+  };
 
   const clearFilters = () => {
     setTierFilter("all");
@@ -188,6 +255,13 @@ export function AdminUsersTab({
     setInactiveOnly(false);
     setJoinedFrom("");
     setJoinedTo("");
+  };
+
+  const handleBulkDelete = () => {
+    if (!onBulkDelete || selectedIds.length === 0) return;
+    onBulkDelete(selectedIds);
+    setSelectedIds([]);
+    setBulkConfirmOpen(false);
   };
 
   return (
@@ -310,12 +384,48 @@ export function AdminUsersTab({
         </Collapsible>
       </AdminPanel>
 
+      {canDelete && selectedIds.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3">
+          <p className="text-sm font-medium">
+            {selectedIds.length} user{selectedIds.length !== 1 ? "s" : ""} selected
+          </p>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => setSelectedIds([])}>
+              Clear
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              className="gap-1.5"
+              disabled={deletePending}
+              onClick={() => setBulkConfirmOpen(true)}
+              data-testid="button-bulk-delete-users"
+            >
+              <Trash2 size={14} /> Delete selected
+            </Button>
+          </div>
+        </div>
+      )}
+
       <AdminPanel padding="none">
         <div className="px-4 sm:px-5 pt-4 sm:pt-5 pb-3 border-b border-border/60">
-          <AdminSectionHeader
-            title="All users"
-            description={`Showing ${pagedUsers.length ? page * PAGE_SIZE + 1 : 0}–${Math.min((page + 1) * PAGE_SIZE, filteredUsers.length)} of ${filteredUsers.length} (${users.length} total) · Tap a row for full profile`}
-          />
+          <div className="flex items-start justify-between gap-3">
+            <AdminSectionHeader
+              title="All users"
+              description={`Showing ${pagedUsers.length ? page * PAGE_SIZE + 1 : 0}–${Math.min((page + 1) * PAGE_SIZE, filteredUsers.length)} of ${filteredUsers.length} (${users.length} total) · Tap a row for full profile`}
+            />
+            {canDelete && deletableOnPage.length > 0 && (
+              <label className="flex items-center gap-2 text-xs text-muted-foreground shrink-0 cursor-pointer">
+                <Checkbox
+                  checked={allPageSelected}
+                  onCheckedChange={checked => toggleSelectAllPage(checked === true)}
+                  data-testid="checkbox-select-all-users"
+                />
+                Select page
+              </label>
+            )}
+          </div>
         </div>
         {usersLoading ? (
           <div className="p-4 space-y-3">
@@ -332,6 +442,9 @@ export function AdminUsersTab({
                 key={u.id}
                 user={u}
                 currentUserId={currentUserId}
+                canDelete={canDelete}
+                selected={selectedIds.includes(u.id)}
+                onToggleSelect={toggleSelect}
                 onSelect={onSelect}
                 onTierChange={onTierChange}
                 onRoleChange={onRoleChange}
@@ -354,6 +467,27 @@ export function AdminUsersTab({
           </div>
         )}
       </AdminPanel>
+
+      <AlertDialog open={bulkConfirmOpen} onOpenChange={setBulkConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.length} user{selectedIds.length !== 1 ? "s" : ""}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes the selected accounts, their projects, payments, and analytics data. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deletePending}
+              onClick={handleBulkDelete}
+            >
+              Delete permanently
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

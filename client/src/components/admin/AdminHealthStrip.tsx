@@ -2,9 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Database, Mail, CreditCard, Webhook, AlertTriangle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { cn } from "@/lib/utils";
 import type { AdminHealth } from "./types";
 
-function HealthPill({
+function HealthChip({
   label,
   ok,
   detail,
@@ -16,14 +17,34 @@ function HealthPill({
   icon: typeof Database;
 }) {
   return (
-    <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs ${
-      ok ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400" : "border-amber-500/30 bg-amber-500/10 text-amber-400"
-    }`}>
-      <Icon size={14} className="shrink-0" />
-      <div className="min-w-0">
-        <p className="font-semibold">{label}</p>
-        {detail && <p className="text-[10px] opacity-80 truncate">{detail}</p>}
+    <div
+      className={cn(
+        "flex items-center gap-2 rounded-lg border px-2.5 py-1.5 min-w-0",
+        ok
+          ? "border-emerald-500/25 bg-emerald-500/5"
+          : "border-amber-500/25 bg-amber-500/5",
+      )}
+    >
+      <Icon
+        size={13}
+        className={cn("shrink-0", ok ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400")}
+      />
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-medium leading-none truncate">{label}</p>
+        {detail && (
+          <p className="text-[10px] text-muted-foreground truncate mt-0.5">{detail}</p>
+        )}
       </div>
+      <span
+        className={cn(
+          "text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0",
+          ok
+            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+            : "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+        )}
+      >
+        {ok ? "OK" : "Warn"}
+      </span>
     </div>
   );
 }
@@ -39,23 +60,36 @@ export function AdminHealthStrip() {
   });
 
   if (!data) {
-    return <div className="h-12 skeleton rounded-xl mb-6" />;
+    return <div className="h-10 skeleton rounded-lg mb-4" />;
   }
 
   const webhookDetail = data.webhookLast
     ? `${data.webhookLast.status} · ${format(new Date(data.webhookLast.at), "dd MMM HH:mm")}`
-    : "No webhook received yet";
+    : "No webhook yet";
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 mb-6" data-testid="admin-health-strip">
-      <HealthPill label="Database" ok={data.db} icon={Database} />
-      <HealthPill label="Email (SMTP)" ok={data.emailConfigured} detail={data.emailConfigured ? "Configured" : "Not configured"} icon={Mail} />
-      <HealthPill label="Paystack" ok={data.paystackConfigured} detail={data.paystackConfigured ? "Keys set" : "Missing keys"} icon={CreditCard} />
-      <HealthPill label="Webhook" ok={!!data.webhookLast} detail={webhookDetail} icon={Webhook} />
-      <HealthPill
-        label="Server errors (24h)"
+    <div
+      className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 mb-4"
+      data-testid="admin-health-strip"
+    >
+      <HealthChip label="Database" ok={data.db} icon={Database} />
+      <HealthChip
+        label="Email"
+        ok={data.emailConfigured}
+        detail={data.emailConfigured ? "SMTP configured" : "Not configured"}
+        icon={Mail}
+      />
+      <HealthChip
+        label="Paystack"
+        ok={data.paystackConfigured}
+        detail={data.paystackConfigured ? "Keys set" : "Missing keys"}
+        icon={CreditCard}
+      />
+      <HealthChip label="Webhook" ok={!!data.webhookLast} detail={webhookDetail} icon={Webhook} />
+      <HealthChip
+        label="Errors (24h)"
         ok={data.serverErrors24h === 0}
-        detail={data.serverErrors24h === 0 ? "None" : `${data.serverErrors24h} error(s)`}
+        detail={data.serverErrors24h === 0 ? "None" : `${data.serverErrors24h} logged`}
         icon={AlertTriangle}
       />
     </div>
