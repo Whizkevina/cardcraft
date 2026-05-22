@@ -90,6 +90,9 @@ export default function Editor() {
   const historyRef = useRef<string[]>([]);
   const historyIndexRef = useRef<number>(-1);
   const isHistoryActionRef = useRef(false);
+  /** Last selected canvas object — kept when sidebar controls steal focus from Fabric */
+  const selectedObjectRef = useRef<any>(null);
+  const panelInteractionRef = useRef(false);
 
   const { fabricLoaded } = useFabric();
   const [canvasReady, setCanvasReady] = useState(false);
@@ -180,6 +183,17 @@ export default function Editor() {
     });
   }, []);
 
+  const syncSelectedObject = useCallback((obj: any | null) => {
+    selectedObjectRef.current = obj;
+    setSelectedObj(obj);
+  }, []);
+
+  const getSelectedCanvasObject = useCallback(() => {
+    const canvas = fabricRef.current;
+    if (!canvas) return null;
+    return canvas.getActiveObject() ?? selectedObjectRef.current;
+  }, []);
+
   // ─── Init canvas ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!fabricLoaded || !canvasRef.current || fabricRef.current) return;
@@ -196,10 +210,20 @@ export default function Editor() {
     });
     fabricRef.current = canvas;
 
-    canvas.on("selection:created", (e: any) => setSelectedObj(e.selected?.[0] || null));
-    canvas.on("selection:updated", (e: any) => setSelectedObj(e.selected?.[0] || null));
-    canvas.on("selection:cleared", () => setSelectedObj(null));
-    canvas.on("object:modified", () => { setSelectedObj(canvas.getActiveObject()); saveHistory(); setIsDirty(true); });
+    canvas.on("selection:created", (e: any) => syncSelectedObject(e.selected?.[0] || null));
+    canvas.on("selection:updated", (e: any) => syncSelectedObject(e.selected?.[0] || null));
+    canvas.on("selection:cleared", () => {
+      if (panelInteractionRef.current) {
+        panelInteractionRef.current = false;
+        return;
+      }
+      syncSelectedObject(null);
+    });
+    canvas.on("object:modified", () => {
+      syncSelectedObject(canvas.getActiveObject() ?? selectedObjectRef.current);
+      saveHistory();
+      setIsDirty(true);
+    });
     canvas.on("object:added", () => { saveHistory(); setIsDirty(true); });
     canvas.on("object:removed", () => { saveHistory(); setIsDirty(true); });
 
@@ -244,7 +268,21 @@ export default function Editor() {
       fabricRef.current = null;
       setCanvasReady(false);
     };
-  }, [fabricLoaded, templateId, editProjectId, templateLoading, templateLoadError, project, saveHistory]);
+  }, [fabricLoaded, templateId, editProjectId, templateLoading, templateLoadError, project, saveHistory, syncSelectedObject]);
+
+  // Clicks on the sidebar / Radix dropdowns deselect Fabric objects — ignore that clear.
+  useEffect(() => {
+    const onMouseDown = (e: MouseEvent) => {
+      const target = e.target as Element | null;
+      if (!target) return;
+      const inEditorChrome = target.closest(
+        ".editor-panel, [role='listbox'], [data-radix-popper-content-wrapper], [data-radix-select-viewport]",
+      );
+      panelInteractionRef.current = !!inEditorChrome;
+    };
+    document.addEventListener("mousedown", onMouseDown, true);
+    return () => document.removeEventListener("mousedown", onMouseDown, true);
+  }, []);
 
   // ─── Load template / project ──────────────────────────────────────────────
   useEffect(() => {
@@ -414,29 +452,41 @@ export default function Editor() {
 
   // ─── Object manipulation ──────────────────────────────────────────────────
   const updateSelectedProp = (prop: string, value: any) => {
-    const obj = fabricRef.current?.getActiveObject();
-    if (!obj) return;
+    const canvas = fabricRef.current;
+    const obj = getSelectedCanvasObject();
+    if (!canvas || !obj) return;
+
+    if (!canvas.getActiveObject()) {
+      canvas.setActiveObject(obj);
+    }
+
     obj.set(prop, value);
-    fabricRef.current.renderAll();
-    setSelectedObj({ ...obj });
+    if (prop === "fontSize" || prop === "fontFamily" || prop === "text" || prop === "fontWeight" || prop === "fontStyle") {
+      obj.initDimensions?.();
+    }
+    canvas.renderAll();
+    syncSelectedObject(canvas.getActiveObject() ?? obj);
+    setIsDirty(true);
   };
 
   const bringForward = () => { fabricRef.current?.getActiveObject()?.bringForward(); fabricRef.current?.renderAll(); };
   const sendBackward = () => { fabricRef.current?.getActiveObject()?.sendBackwards(); fabricRef.current?.renderAll(); };
 
   const toggleLock = () => {
-    const obj = fabricRef.current?.getActiveObject();
+    const obj = getSelectedCanvasObject();
     if (!obj) return;
     const locked = !obj.selectable;
     obj.selectable = locked; obj.evented = locked;
     fabricRef.current?.renderAll();
-    setSelectedObj({ ...obj, selectable: locked });
+    syncSelectedObject(obj);
   };
 
   const deleteSelected = () => {
-    const obj = fabricRef.current?.getActiveObject();
+    const obj = fabricRef.current?.getActiveObject() ?? selectedObjectRef.current;
     if (!obj) return;
-    fabricRef.current?.remove(obj); fabricRef.current?.renderAll(); setSelectedObj(null);
+    fabricRef.current?.remove(obj);
+    fabricRef.current?.renderAll();
+    syncSelectedObject(null);
   };
 
   const addText = () => {
@@ -762,7 +812,7 @@ export default function Editor() {
       });
     }
     fabricRef.current.renderAll();
-    setSelectedObj({ ...obj });
+    syncSelectedObject(obj);
     saveHistory();
   };
 
@@ -1414,12 +1464,14 @@ export default function Editor() {
                     <div className="flex gap-2">
                       <button
                         onClick={() => {
-                          const obj = fabricRef.current?.getActiveObject();
-                          if (!obj) return;
+                          const canvas = fabricRef.current;
+                          const obj = getSelectedCanvasObject();
+                          if (!canvas || !obj) return;
                           const f = (window as any).fabric;
                           if (obj.shadow) { obj.set("shadow", null); }
                           else { obj.set("shadow", new f.Shadow({ color: "rgba(0,0,0,0.5)", blur: 6, offsetX: 2, offsetY: 2 })); }
-                          fabricRef.current.renderAll(); setSelectedObj({ ...obj });
+                          canvas.renderAll();
+                          syncSelectedObject(canvas.getActiveObject() ?? obj);
                         }}
                         className={`flex-1 text-xs px-2 py-1.5 rounded border ${selectedObj?.shadow ? "bg-primary text-primary-foreground border-primary" : "bg-secondary border-border"}`}
                         data-testid="button-shadow"

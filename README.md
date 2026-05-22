@@ -124,7 +124,9 @@ GMAIL_USER=your@gmail.com
 GMAIL_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
 ```
 
-E2E tests use `.env.test` (see [`.env.test.example`](.env.test.example)).
+E2E tests use `.env.test` (see [`.env.test.example`](.env.test.example)). **Use local Postgres only** — E2E mutates admin credentials and can truncate tables when `E2E_RESET_DB=true`. Tests refuse to run against Supabase URLs.
+
+**Supabase production:** run [`script/supabase-hardening.sql`](script/supabase-hardening.sql) once in the Supabase SQL Editor to enable RLS and block anon/authenticated API access (CardCraft uses Express + `DATABASE_URL`, not the Supabase client).
 
 > **Gmail App Password**: Go to [myaccount.google.com](https://myaccount.google.com) → Security → 2-Step Verification → App Passwords → Create one for "Mail".
 

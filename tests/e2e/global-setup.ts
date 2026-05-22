@@ -1,10 +1,13 @@
 import { initDb } from "../../server/storage";
 import { resetDatabase, seedTemplate, getTemplateCount } from "./helpers/db";
+import { assertSafeE2EDatabase } from "./helpers/safeDb";
 
 export default async function globalSetup() {
   if (!process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL is required for e2e tests.");
   }
+
+  assertSafeE2EDatabase();
 
   await initDb();
 
