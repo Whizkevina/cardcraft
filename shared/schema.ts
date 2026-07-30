@@ -8,7 +8,7 @@ export const users = pgTable("users", {
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
-  role: text("role", { enum: ["guest", "user", "admin"] }).notNull().default("user"),
+  role: text("role", { enum: ["guest", "user", "admin", "support", "content"] }).notNull().default("user"),
   tier: text("tier", { enum: ["free", "pro"] }).notNull().default("free"),
   theme: text("theme", { enum: ["dark", "light"] }).notNull().default("dark"),
   downloadsToday: integer("downloads_today").notNull().default(0),

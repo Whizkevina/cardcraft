@@ -27,7 +27,7 @@ export async function updateUserTier(id: number, tier: "free" | "pro", proExpire
   return user;
 }
 export async function updateUserRole(id: number, role: "user" | "admin" | "support" | "content"): Promise<User | undefined> {
-  const [user] = await getDb().update(schema.users).set({ role: role as any }).where(eq(schema.users.id, id)).returning();
+  const [user] = await getDb().update(schema.users).set({ role }).where(eq(schema.users.id, id)).returning();
   return user;
 }
 export async function updateUserPassword(id: number, hashedPassword: string): Promise<User | undefined> {
