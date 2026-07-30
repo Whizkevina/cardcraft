@@ -2,9 +2,9 @@
 
 Gradual build plan for CardCraft's admin panel — from basic SaaS standards through enterprise polish.
 
-**Last updated:** 2026-05-20 (Analytics & Audit system)  
+**Last updated:** 2026-07-30 (reconciled statuses with shipped code)  
 **Live admin page:** `client/src/pages/AdminPage.tsx`  
-**Admin API routes:** `server/routes.ts` (`/api/admin/*`)
+**Admin API routes:** `server/routes/admin.ts` (`/api/admin/*`)
 
 ---
 
@@ -131,16 +131,16 @@ These exist today and are the foundation for Tiers 1–4.
 | Task | Status | Notes |
 |------|--------|-------|
 | Widget: users at download cap today | ✅ | Analytics tab ops widgets |
-| Widget: bulk generate usage (Pro) | ⏳ | May need event logging |
+| Widget: bulk generate usage (Pro) | ✅ | `AdminOpsWidgets` "Bulk generate (30d)" KPI card, backed by `getBulkGenerateCount30d` |
 | Widget: share link creation count | ✅ | Active share links widget |
-| Widget: export format breakdown (PNG/JPG/SVG) | ⏳ | Needs export analytics events |
+| Widget: export format breakdown (PNG/JPG/SVG) | ✅ | `AdminOpsWidgets` "Export formats" panel, backed by `getExportFormatBreakdown` |
 | List users near free project limit | ✅ | `FREE_PROJECT_LIMIT` in schema |
 
 ### 2.3 Support tools
 
 | Task | Status | Notes |
 |------|--------|-------|
-| Read-only “view as user” (My Cards) | 🔄 | User detail drawer lists cards + share preview; no full impersonation |
+| Read-only “view as user” (My Cards) | ✅ | Session-based impersonation (`POST/DELETE /api/admin/impersonate/:id`) + `ImpersonationBanner` — staff can browse a user's actual `/projects` read-only and exit; writes are blocked via `blockIfImpersonating` |
 | Admin-triggered password reset | ✅ | Overlap 1.1 |
 | Internal note per user | ✅ | `users.admin_note` + save in detail drawer |
 | Copy user ID / email quick actions | ✅ | Detail drawer header |
@@ -203,10 +203,10 @@ These exist today and are the foundation for Tiers 1–4.
 
 | Task | Status | Notes |
 |------|--------|-------|
-| Role: Support (users read + tier, no delete) | ⏳ | Extend `role` enum |
-| Role: Content (templates only) | ⏳ | |
-| Role: Super admin (full access) | 🔄 | Current single `admin` role |
-| Permission checks per route | ⏳ | `requirePermission('users:write')` |
+| Role: Support (users read + tier, no delete) | ✅ | `server/permissions.ts` `StaffRole` — support gets read/write on users & payments, no delete/role-change |
+| Role: Content (templates only) | ✅ | `content` role — templates read/write + analytics read only |
+| Role: Super admin (full access) | 🔄 | Current single `admin` role — still no tier above it |
+| Permission checks per route | ✅ | `requirePermission(...)` middleware on every `/api/admin/*` route in `server/routes/admin.ts` |
 
 **Tier 3 exit criteria:** Product decisions (what templates to build, who converts, what to feature) are data-driven from the dashboard.
 
@@ -303,6 +303,7 @@ Record completed phases here as you go.
 | — | Baseline admin (analytics, users, templates) | Pre-roadmap |
 | 2026-05-20 | **Phase A** — user drawer, payments tab, audit log, filters | `9ffd301` |
 | 2026-05-20 | **Phase A leftovers** — last login, auth provider, suspend/reset/logout, Pro expiry, payment date filter, refund notes, inactive/joined filters | (pending push) |
+| 2026-07-30 | Status reconciliation — support/content roles, per-route permission checks, read-only impersonation, and the bulk-generate/export-format ops widgets were already shipped but still marked ⏳/🔄 in this doc | doc-only, no code change |
 
 ---
 
