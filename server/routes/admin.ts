@@ -5,6 +5,7 @@ import { hashIp } from "../auditUtils";
 import { getAnalyticsDashboard, getAnalyticsLiveFeed } from "../analyticsService";
 import { getServerErrors24h } from "../metrics";
 import { sendPasswordResetForEmail } from "../email";
+import { paystackRequest } from "../paystackClient";
 import {
   requireAuth,
   requireStaff,
@@ -121,6 +122,73 @@ export function registerAdminRoutes(app: Express) {
     if (!payment) return res.status(404).json({ error: "Not found" });
     await logAdmin(req, "payment.refund_note", "payment", id, { refundNote: note });
     res.json(safePayment(payment));
+  });
+
+  // Manual re-verification against Paystack — covers a missed/failed webhook
+  // delivery ("replay") without waiting for Paystack to retry it.
+  app.post("/api/admin/payments/:id/verify", requireAuth, requireStaff, requirePermission("payments:write"), async (req, res) => {
+    const id = safeId(req.params.id);
+    if (!id) return res.status(400).json({ error: "Invalid ID" });
+    const payment = await storage.getPaymentById(id);
+    if (!payment) return res.status(404).json({ error: "Not found" });
+
+    let paystackRes: any;
+    try {
+      paystackRes = await paystackRequest("GET", `/transaction/verify/${encodeURIComponent(payment.reference)}`);
+    } catch (e: any) {
+      console.error("[Paystack] Manual verify error:", e);
+      return res.status(502).json({ error: "Could not reach Paystack to verify this reference" });
+    }
+
+    if (!paystackRes?.status) {
+      await logAdmin(req, "payment.manual_verify", "payment", id, {
+        reference: payment.reference,
+        outcome: "unverifiable",
+        paystackMessage: paystackRes?.message ?? null,
+      });
+      return res.status(502).json({
+        error: paystackRes?.message || "Paystack could not verify this reference",
+        payment: safePayment(payment),
+      });
+    }
+
+    const paystackStatus = paystackRes.data?.status;
+    const before = payment.status;
+
+    if (paystackStatus === "success" && before !== "success") {
+      await storage.updatePaymentStatus(payment.reference, "success");
+      await storage.updateUserTier(payment.userId, "pro");
+      const updated = await storage.getPaymentById(id);
+      await logAdmin(req, "payment.manual_verify", "payment", id, {
+        reference: payment.reference,
+        outcome: "reconciled",
+        from: before,
+        to: "success",
+        paystackStatus,
+      });
+      return res.json({ reconciled: true, paystackStatus, payment: safePayment(updated!) });
+    }
+
+    if (paystackStatus && paystackStatus !== "success" && before === "pending") {
+      await storage.updatePaymentStatus(payment.reference, "failed");
+      const updated = await storage.getPaymentById(id);
+      await logAdmin(req, "payment.manual_verify", "payment", id, {
+        reference: payment.reference,
+        outcome: "reconciled",
+        from: before,
+        to: "failed",
+        paystackStatus,
+      });
+      return res.json({ reconciled: true, paystackStatus, payment: safePayment(updated!) });
+    }
+
+    await logAdmin(req, "payment.manual_verify", "payment", id, {
+      reference: payment.reference,
+      outcome: "no_change",
+      currentStatus: before,
+      paystackStatus,
+    });
+    res.json({ reconciled: false, paystackStatus, payment: safePayment(payment) });
   });
 
   app.post("/api/admin/users/:id/send-password-reset", requireAuth, requireStaff, requirePermission("users:write"), async (req, res) => {

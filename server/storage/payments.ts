@@ -4,6 +4,7 @@ import type { Payment, InsertPayment } from "@shared/schema";
 import { getDb } from "./db";
 
 export async function getPayment(reference: string): Promise<Payment | undefined> { const [p] = await getDb().select().from(schema.payments).where(eq(schema.payments.reference, reference)).limit(1); return p; }
+export async function getPaymentById(id: number): Promise<Payment | undefined> { const [p] = await getDb().select().from(schema.payments).where(eq(schema.payments.id, id)).limit(1); return p; }
 export async function getPaymentsByUser(userId: number): Promise<Payment[]> { return getDb().select().from(schema.payments).where(eq(schema.payments.userId, userId)).orderBy(desc(schema.payments.createdAt)); }
 export async function createPayment(data: InsertPayment): Promise<Payment> { const [p] = await getDb().insert(schema.payments).values(data).returning(); return p; }
 export async function updatePaymentStatus(reference: string, status: "success" | "failed"): Promise<Payment | undefined> { const [p] = await getDb().update(schema.payments).set({ status }).where(eq(schema.payments.reference, reference)).returning(); return p; }

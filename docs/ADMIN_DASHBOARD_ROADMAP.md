@@ -238,7 +238,7 @@ These exist today and are the foundation for Tiers 1–4.
 | Task | Status | Notes |
 |------|--------|-------|
 | Rate limit override per user | ⏳ | |
-| Paystack webhook replay / manual verify | ⏳ | |
+| Paystack webhook replay / manual verify | ✅ | `POST /api/admin/payments/:id/verify` — re-runs Paystack transaction verification for a pending/failed payment and reconciles status + Pro tier; "Verify" button on Payments tab; audit-logged as `payment.manual_verify` |
 | Email campaign hook (dormant signups) | 🚫 | Integrate later with Mailchimp etc. |
 | Multi-admin concurrent edit warnings | 🚫 | Low priority |
 
