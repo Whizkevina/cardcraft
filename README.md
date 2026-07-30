@@ -102,6 +102,34 @@ NODE_ENV=production node dist/index.cjs
 
 ---
 
+## 🗄 Database Migrations
+
+Schema changes are tracked as SQL files in [`migrations/`](migrations), generated from [`shared/schema.ts`](shared/schema.ts) via Drizzle Kit.
+
+**Changing the schema:**
+```bash
+# 1. Edit shared/schema.ts
+# 2. Generate a migration from the diff
+npm run db:generate
+# 3. Apply it
+npm run db:migrate
+```
+
+**Fresh database (new local setup, new environment):**
+```bash
+npm run db:migrate
+```
+
+**Existing database that predates migrations** (any environment whose tables were created via the old `npm run db:push` workflow — e.g. the current production DB) — run this **once**, before ever running `db:migrate` against it:
+```bash
+npm run db:mark-baseline-applied
+```
+This records the baseline migration as already-applied without re-running its `CREATE TABLE` statements, so it won't collide with tables that already exist. It's a no-op (safe to re-run) once applied. After this one-time step, use `db:migrate` for all future schema changes on that database.
+
+`npm run db:push` still exists for quick local iteration, but avoid it once a database has adopted migrations — it can silently drift from the migration history.
+
+---
+
 ## ⚙️ Environment Variables
 
 Copy [`.env.example`](.env.example) to `.env.local` for local development. The server loads `.env.local` first, then `.env`.
