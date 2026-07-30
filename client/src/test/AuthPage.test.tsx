@@ -29,7 +29,7 @@ describe("AuthPage", () => {
 
     await user.click(screen.getByTestId("button-toggle-mode"));
 
-    expect(screen.getByText("Create account")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create account" })).toBeInTheDocument();
     expect(screen.getByLabelText(/Full Name/i)).toBeInTheDocument();
   });
 });
