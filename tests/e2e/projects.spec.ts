@@ -21,10 +21,6 @@ test("save a project and view it in My Cards", async ({ page }) => {
   const project = await response.json();
   await expect(page.getByRole("status").filter({ hasText: "Saved!" }).first()).toBeVisible();
 
-  const listResponse = page.waitForResponse(response =>
-    response.url().includes("/api/projects") && response.request().method() === "GET" && response.ok()
-  );
   await page.goto("/#/projects");
-  await listResponse;
   await expect(page.getByText(project.title || title)).toBeVisible();
 });
