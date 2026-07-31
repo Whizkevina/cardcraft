@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Search, CreditCard, RefreshCw } from "lucide-react";
+import { Search, CreditCard, RefreshCw, Download } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
@@ -165,6 +165,16 @@ export function AdminPaymentsTab() {
 
   const payments = data?.payments ?? [];
 
+  const exportCsv = () => {
+    const params = new URLSearchParams();
+    if (status !== "all") params.set("status", status);
+    if (email.trim()) params.set("email", email.trim());
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    const qs = params.toString();
+    window.open(`/api/admin/payments/export${qs ? `?${qs}` : ""}`, "_blank");
+  };
+
   return (
     <div className="space-y-4">
       <AdminPanel>
@@ -216,7 +226,15 @@ export function AdminPaymentsTab() {
 
       <AdminPanel padding="none">
         <div className="px-4 sm:px-5 pt-4 sm:pt-5 pb-3 border-b border-border/60">
-          <AdminSectionHeader title="Transactions" description={`${payments.length} payment${payments.length !== 1 ? "s" : ""} matching filters`} />
+          <AdminSectionHeader
+            title="Transactions"
+            description={`${payments.length} payment${payments.length !== 1 ? "s" : ""} matching filters`}
+            action={
+              <Button type="button" variant="outline" size="sm" className="h-9 gap-1.5" onClick={exportCsv} data-testid="button-export-payments-csv">
+                <Download size={14} /> CSV
+              </Button>
+            }
+          />
         </div>
 
         {isLoading ? (

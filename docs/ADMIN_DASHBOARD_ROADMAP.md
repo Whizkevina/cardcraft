@@ -220,9 +220,9 @@ These exist today and are the foundation for Tiers 1–4.
 
 | Task | Status | Notes |
 |------|--------|-------|
-| Export users CSV | ⏳ | |
-| Export payments CSV | ⏳ | |
-| Export projects metadata CSV | ⏳ | |
+| Export users CSV | ✅ | Client-side export of the currently filtered Users tab list (`AdminUsersTab`) |
+| Export payments CSV | ✅ | `GET /api/admin/payments/export`, honors the tab's status/email/date filters |
+| Export projects metadata CSV | ✅ | `GET /api/admin/projects/export`, honors the tab's search/shared-only filters |
 | Scheduled email report (weekly KPIs) | 🚫 | Optional automation |
 
 ### 4.2 Privacy & compliance

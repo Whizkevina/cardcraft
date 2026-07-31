@@ -6,6 +6,7 @@ import { getAnalyticsDashboard, getAnalyticsLiveFeed } from "../analyticsService
 import { getServerErrors24h } from "../metrics";
 import { sendPasswordResetForEmail } from "../email";
 import { paystackRequest } from "../paystackClient";
+import { toCsv, sendCsv } from "../csv";
 import {
   requireAuth,
   requireStaff,
@@ -306,14 +307,26 @@ export function registerAdminRoutes(app: Express) {
       return res.json(rows);
     }
     const headers = ["id", "createdAt", "action", "severity", "actorName", "actorEmail", "actorRole", "targetType", "targetId", "pagePath", "ipAddress", "sessionId"];
-    const csv = [headers.join(",")].concat(rows.map((r: Record<string, unknown>) => headers.map(h => {
-      const val = (r as Record<string, unknown>)[h];
-      const s = val == null ? "" : String(val).replace(/"/g, '""');
-      return `"${s}"`;
-    }).join(","))).join("\n");
-    res.setHeader("Content-Type", "text/csv");
-    res.setHeader("Content-Disposition", `attachment; filename="audit-log-${Date.now()}.csv"`);
-    res.send(csv);
+    sendCsv(res, "audit-log", toCsv(headers, rows));
+  });
+
+  app.get("/api/admin/payments/export", requireAuth, requireStaff, requirePermission("payments:read"), async (req, res) => {
+    const status = typeof req.query.status === "string" ? req.query.status : undefined;
+    const email = typeof req.query.email === "string" ? req.query.email : undefined;
+    const from = typeof req.query.from === "string" ? req.query.from : undefined;
+    const to = typeof req.query.to === "string" ? req.query.to : undefined;
+    const payments = await storage.getAdminPayments({ status, email, from, to, limit: 5000 });
+    const rows = payments.map(safePayment);
+    const headers = ["id", "userName", "userEmail", "reference", "amount", "currency", "status", "plan", "refundNote", "createdAt"];
+    sendCsv(res, "payments", toCsv(headers, rows));
+  });
+
+  app.get("/api/admin/projects/export", requireAuth, requireStaff, requirePermission("projects:moderate"), async (req, res) => {
+    const search = typeof req.query.search === "string" ? req.query.search : undefined;
+    const sharedOnly = req.query.sharedOnly === "true";
+    const projects = await storage.getAdminProjects({ search, sharedOnly, limit: 5000 });
+    const headers = ["id", "userName", "userEmail", "title", "templateTitle", "shareEnabled", "shareToken", "updatedAt", "createdAt"];
+    sendCsv(res, "projects", toCsv(headers, projects));
   });
 
   app.get("/api/admin/audit-log/:id", requireAuth, requireStaff, requirePermission("audit:read"), async (req, res) => {

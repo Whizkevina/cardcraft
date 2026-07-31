@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import {
-  Search, Sparkles, Crown, Shield, ChevronRight, Ban, SlidersHorizontal, X, ChevronLeft, Trash2,
+  Search, Sparkles, Crown, Shield, ChevronRight, Ban, SlidersHorizontal, X, ChevronLeft, Trash2, Download,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,26 @@ interface AdminUsersTabProps {
 
 function canDeleteUser(user: AdminUser, currentUserId: number): boolean {
   return user.id !== currentUserId && user.role !== "admin";
+}
+
+const USER_CSV_HEADERS = [
+  "id", "name", "email", "role", "tier", "status", "authProvider",
+  "downloadsToday", "totalDownloads", "projectCount", "sharedCount",
+  "lastLoginAt", "proExpiresAt", "createdAt",
+] as const;
+
+function downloadUsersCsv(users: AdminUser[]) {
+  const escape = (val: unknown) => `"${val == null ? "" : String(val).replace(/"/g, '""')}"`;
+  const csv = [USER_CSV_HEADERS.join(",")]
+    .concat(users.map(u => USER_CSV_HEADERS.map(h => escape(u[h])).join(",")))
+    .join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `users-${Date.now()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function UserRow({
@@ -415,16 +435,28 @@ export function AdminUsersTab({
               title="All users"
               description={`Showing ${pagedUsers.length ? page * PAGE_SIZE + 1 : 0}–${Math.min((page + 1) * PAGE_SIZE, filteredUsers.length)} of ${filteredUsers.length} (${users.length} total) · Tap a row for full profile`}
             />
-            {canDelete && deletableOnPage.length > 0 && (
-              <label className="flex items-center gap-2 text-xs text-muted-foreground shrink-0 cursor-pointer">
-                <Checkbox
-                  checked={allPageSelected}
-                  onCheckedChange={checked => toggleSelectAllPage(checked === true)}
-                  data-testid="checkbox-select-all-users"
-                />
-                Select page
-              </label>
-            )}
+            <div className="flex items-center gap-3 shrink-0">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9 gap-1.5"
+                onClick={() => downloadUsersCsv(filteredUsers)}
+                data-testid="button-export-users-csv"
+              >
+                <Download size={14} /> CSV
+              </Button>
+              {canDelete && deletableOnPage.length > 0 && (
+                <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                  <Checkbox
+                    checked={allPageSelected}
+                    onCheckedChange={checked => toggleSelectAllPage(checked === true)}
+                    data-testid="checkbox-select-all-users"
+                  />
+                  Select page
+                </label>
+              )}
+            </div>
           </div>
         </div>
         {usersLoading ? (

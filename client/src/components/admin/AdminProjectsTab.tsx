@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Search, ExternalLink, Link2Off, Trash2, Share2, ChevronRight } from "lucide-react";
+import { Search, ExternalLink, Link2Off, Trash2, Share2, ChevronRight, Download } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
@@ -59,6 +59,14 @@ export function AdminProjectsTab() {
     onError: () => toast({ title: "Could not delete project", variant: "destructive" }),
   });
 
+  const exportCsv = () => {
+    const params = new URLSearchParams();
+    if (search.trim()) params.set("search", search.trim());
+    if (sharedOnly) params.set("sharedOnly", "true");
+    const qs = params.toString();
+    window.open(`/api/admin/projects/export${qs ? `?${qs}` : ""}`, "_blank");
+  };
+
   return (
     <div className="space-y-4">
       <AdminPanel>
@@ -89,6 +97,11 @@ export function AdminProjectsTab() {
           <AdminSectionHeader
             title="Saved cards"
             description={`${projects.length} project${projects.length !== 1 ? "s" : ""} · moderate shared content and support deletes`}
+            action={
+              <Button type="button" variant="outline" size="sm" className="h-9 gap-1.5" onClick={exportCsv} data-testid="button-export-projects-csv">
+                <Download size={14} /> CSV
+              </Button>
+            }
           />
         </div>
 
