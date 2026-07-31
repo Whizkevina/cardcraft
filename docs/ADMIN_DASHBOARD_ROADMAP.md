@@ -227,11 +227,15 @@ These exist today and are the foundation for Tiers 1–4.
 
 ### 4.2 Privacy & compliance
 
+Fully scoped (schema, endpoints, storage functions, UI, effort estimate, open
+parameters) in [`GDPR_DATA_EXPORT_DELETION_PLAN.md`](GDPR_DATA_EXPORT_DELETION_PLAN.md) —
+read that doc before starting any of the three rows below.
+
 | Task | Status | Notes |
 |------|--------|-------|
-| User data export (GDPR package) | ⏳ | JSON zip: profile, projects, payments |
-| User data deletion request workflow | ⏳ | Soft delete + anonymize |
-| Deletion audit trail | ⏳ | |
+| User data export (GDPR package) | ⏳ | Scoped: JSON download of profile, projects, payments — see plan doc |
+| User data deletion request workflow | ⏳ | Scoped: admin-mediated, grace period, anonymize-not-delete payments — see plan doc |
+| Deletion audit trail | ⏳ | Scoped as part of the same plan (rides on existing `admin_audit_log`) |
 
 ### 4.3 Advanced operations
 
@@ -311,3 +315,4 @@ Record completed phases here as you go.
 
 - [README.md](../README.md) — setup, admin seed, env vars
 - [RELEASE_CHECKLIST.md](../RELEASE_CHECKLIST.md) — deploy checklist
+- [GDPR_DATA_EXPORT_DELETION_PLAN.md](GDPR_DATA_EXPORT_DELETION_PLAN.md) — full build plan for Tier 4 § 4.2, not yet implemented
