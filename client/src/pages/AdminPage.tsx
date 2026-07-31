@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 
 import { useToast } from "@/hooks/use-toast";
 
-import { Users, TrendingUp, CreditCard, LayoutTemplate, Pencil, ScrollText, FolderOpen, Shield, Plus, Eye, EyeOff, Trash2, Search } from "lucide-react";
+import { Users, TrendingUp, CreditCard, LayoutTemplate, Pencil, ScrollText, FolderOpen, Shield, Plus, Eye, EyeOff, Trash2, Search, Crown } from "lucide-react";
 
 import { Link } from "wouter";
 
@@ -61,7 +61,7 @@ const tabTriggerClass =
 
 
 
-function TemplateRow({ template, onToggle, onDelete }: { template: Template; onToggle: (id: number, status: "published" | "draft") => void; onDelete: (id: number) => void }) {
+function TemplateRow({ template, onToggle, onToggleIsPro, onDelete }: { template: Template; onToggle: (id: number, status: "published" | "draft") => void; onToggleIsPro: (id: number, isPro: boolean) => void; onDelete: (id: number) => void }) {
 
   return (
 
@@ -108,6 +108,34 @@ function TemplateRow({ template, onToggle, onDelete }: { template: Template; onT
           {template.status}
 
         </span>
+
+        {Boolean(template.isPro) && (
+
+          <span className="text-[10px] px-2 py-1 rounded-full font-medium bg-amber-500/15 text-amber-400 flex items-center gap-1">
+
+            <Crown size={10} /> Pro
+
+          </span>
+
+        )}
+
+        <button
+
+          type="button"
+
+          onClick={() => onToggleIsPro(template.id, !template.isPro)}
+
+          title={template.isPro ? "Make free" : "Make Pro-only"}
+
+          className={`p-2 rounded-lg transition-colors ${template.isPro ? "text-amber-400 hover:bg-amber-500/15" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}
+
+          data-testid={`button-toggle-pro-template-${template.id}`}
+
+        >
+
+          <Crown size={14} />
+
+        </button>
 
         <Link
 
@@ -179,6 +207,8 @@ function CreateTemplateDialog({ onCreated }: { onCreated: () => void }) {
 
   const [color, setColor] = useState("#1a0533");
 
+  const [isPro, setIsPro] = useState(false);
+
   const { toast } = useToast();
 
   const qc = useQueryClient();
@@ -191,13 +221,13 @@ function CreateTemplateDialog({ onCreated }: { onCreated: () => void }) {
 
       const canvas = JSON.stringify({ objects: [{ type:"rect",left:0,top:0,width:800,height:1000,fill:color,selectable:false,evented:false,customType:"background",locked:true },{ type:"text",text:"Greeting",left:400,top:350,fontSize:48,fontFamily:"Georgia",fill:"#FFFFFF",textAlign:"center",originX:"center",customType:"greeting",editable:true,movable:true,styleEditable:true },{ type:"text",text:"NAME",left:400,top:430,fontSize:64,fontFamily:"Georgia",fontWeight:"bold",fill:"#FFD700",textAlign:"center",originX:"center",customType:"name",editable:true,movable:true,styleEditable:true },{ type:"text",text:"Date",left:400,top:520,fontSize:28,fontFamily:"Georgia",fill:"rgba(255,255,255,0.8)",textAlign:"center",originX:"center",customType:"date",editable:true,movable:true,styleEditable:true }], background:color });
 
-      const res = await apiRequest("POST", "/api/templates", { title, category:"birthday", status:"draft", canvasJson:canvas, thumbnailColor:color });
+      const res = await apiRequest("POST", "/api/templates", { title, category:"birthday", status:"draft", canvasJson:canvas, thumbnailColor:color, isPro: isPro ? 1 : 0 });
 
       if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
 
     },
 
-    onSuccess: () => { qc.invalidateQueries({ queryKey:["/api/templates"] }); toast({ title:"Template created!" }); setOpen(false); setTitle(""); setColor("#1a0533"); onCreated(); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey:["/api/templates"] }); toast({ title:"Template created!" }); setOpen(false); setTitle(""); setColor("#1a0533"); setIsPro(false); onCreated(); },
 
     onError: (e: any) => toast({ title:"Error", description:e.message, variant:"destructive" }),
 
@@ -246,6 +276,14 @@ function CreateTemplateDialog({ onCreated }: { onCreated: () => void }) {
             </div>
 
           </div>
+
+          <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+
+            <input type="checkbox" checked={isPro} onChange={e => setIsPro(e.target.checked)} className="w-4 h-4 rounded cursor-pointer accent-amber-500" data-testid="checkbox-template-pro" />
+
+            Pro-only template
+
+          </label>
 
           <Button onClick={() => mutation.mutate()} disabled={!title || mutation.isPending} className="w-full">
 
@@ -310,6 +348,14 @@ export default function AdminPage() {
     mutationFn: async ({ id, status }: { id: number; status: "published" | "draft" }) => { await apiRequest("PATCH", `/api/templates/${id}`, { status }); },
 
     onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/templates"] }),
+
+  });
+
+  const toggleIsPro = useMutation({
+
+    mutationFn: async ({ id, isPro }: { id: number; isPro: boolean }) => { await apiRequest("PATCH", `/api/templates/${id}`, { isPro: isPro ? 1 : 0 }); },
+
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/templates"] }); toast({ title: "Template updated" }); },
 
   });
 
@@ -710,6 +756,8 @@ export default function AdminPage() {
                     template={t}
 
                     onToggle={(id, status) => toggleStatus.mutate({ id, status })}
+
+                    onToggleIsPro={(id, isPro) => toggleIsPro.mutate({ id, isPro })}
 
                     onDelete={id => deleteTemplate.mutate(id)}
 

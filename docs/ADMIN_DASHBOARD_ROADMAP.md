@@ -186,7 +186,7 @@ These exist today and are the foundation for Tiers 1–4.
 |------|--------|-------|
 | Duplicate template | ⏳ | |
 | Mark template as **featured** (landing hero pool) | ⏳ | `featured` boolean |
-| Toggle **Pro-only** in admin UI | 🔄 | `isPro` exists in schema; not exposed in AdminPage |
+| Toggle **Pro-only** in admin UI | ✅ | Crown toggle button per template row + checkbox in the create-template dialog |
 | Reorder gallery (drag or sort order field) | ⏳ | `sort_order` column |
 | Regenerate preview thumbnail (admin button) | ⏳ | Wrap `npm run db:previews` logic in API |
 | Bulk publish / unpublish by category | ⏳ | |
