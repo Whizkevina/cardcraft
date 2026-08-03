@@ -1,7 +1,7 @@
 import { Download, Image, Palette, Share2 } from "lucide-react";
 import { FeatureCard } from "./FeatureCard";
 import { MarketingSection } from "./MarketingSection";
-import { SectionHeading } from "./SectionHeading";
+import { PageHeader } from "./PageHeader";
 
 const features = [
   {
@@ -29,7 +29,8 @@ const features = [
 export function HomeFeatures() {
   return (
     <MarketingSection spacing="default" tone="contrast" className="border-y border-border/60">
-      <SectionHeading
+      <PageHeader
+        level="h2"
         eyebrow="Editor"
         title="Four things that matter"
         description="Templates, portraits, exports, and scale — without a sprawling toolbar or design degree."
@@ -42,7 +43,7 @@ export function HomeFeatures() {
             icon={f.icon}
             title={f.title}
             description={f.desc}
-            variant="default"
+            variant={i === 0 ? "featured" : "default"}
             testId={`card-feature-${i}`}
           />
         ))}

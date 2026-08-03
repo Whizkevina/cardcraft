@@ -14,8 +14,8 @@ import { format } from "date-fns";
 import type { Payment } from "@shared/schema";
 
 const STATUS_CONFIG = {
-  success: { label: "Paid", icon: CheckCircle, color: "text-green-500", bg: "bg-green-500/10" },
-  pending: { label: "Pending", icon: Clock, color: "text-yellow-500", bg: "bg-yellow-500/10" },
+  success: { label: "Paid", icon: CheckCircle, color: "text-primary", bg: "bg-primary/10" },
+  pending: { label: "Pending", icon: Clock, color: "text-pending", bg: "bg-pending/10" },
   failed: { label: "Failed", icon: XCircle, color: "text-destructive", bg: "bg-destructive/10" },
 };
 

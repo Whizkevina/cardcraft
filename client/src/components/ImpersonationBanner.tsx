@@ -11,8 +11,8 @@ export function ImpersonationBanner() {
   if (!impersonating) return null;
 
   return (
-    <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
-      <p className="flex items-center gap-2 text-amber-200">
+    <div className="bg-pending/15 border-b border-pending/30 px-4 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
+      <p className="flex items-center gap-2 text-pending">
         <Eye size={16} />
         <span>
           Support view — read-only as <strong>{impersonating.userName}</strong>

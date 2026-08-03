@@ -280,7 +280,7 @@ export default function BulkGenerate() {
 
         <SurfaceCard variant="raised" className="p-6 mb-4">
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">1</div>
+            <span className={hpCn(hp.display, "text-lg text-gold/80 tabular-nums w-5 text-right shrink-0")}>01</span>
             <h2 className="font-semibold text-sm">Select template</h2>
           </div>
           <Select value={templateId} onValueChange={setTemplateId}>
@@ -306,7 +306,7 @@ export default function BulkGenerate() {
 
         <SurfaceCard variant="raised" className="p-6 mb-4">
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">2</div>
+            <span className={hpCn(hp.display, "text-lg text-gold/80 tabular-nums w-5 text-right shrink-0")}>02</span>
             <h2 className="font-semibold text-sm">Upload CSV</h2>
             <button onClick={downloadSampleCSV} className="ml-auto text-xs text-gold hover:underline flex items-center gap-1">
               <FileText size={12} /> Download sample CSV
@@ -323,7 +323,7 @@ export default function BulkGenerate() {
               <input type="file" accept=".csv,text/csv" className="hidden" onChange={handleCSVUpload} data-testid="input-csv-upload" />
             </label>
             {rows.length > 0 && (
-              <p className="mt-3 text-xs text-green-500 font-medium">{rows.length} rows loaded</p>
+              <p className="mt-3 text-xs text-foreground font-medium">{rows.length} rows loaded</p>
             )}
           </div>
         </SurfaceCard>
@@ -331,7 +331,7 @@ export default function BulkGenerate() {
         {rows.length > 0 && (
           <SurfaceCard variant="raised" className="p-6 mb-4">
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">3</div>
+              <span className={hpCn(hp.display, "text-lg text-gold/80 tabular-nums w-5 text-right shrink-0")}>03</span>
               <h2 className="font-semibold text-sm">Preview & generate</h2>
               <span className="ml-auto text-xs text-muted-foreground">{doneCount}/{rows.length} done</span>
             </div>
@@ -355,8 +355,8 @@ export default function BulkGenerate() {
                       <td className="py-2 px-3 text-muted-foreground">{row.date}</td>
                       <td className="py-2 px-3">
                         {row.status === "pending" && <span className="text-muted-foreground">Pending</span>}
-                        {row.status === "generating" && <span className="text-yellow-500 flex items-center gap-1"><Loader2 size={10} className="animate-spin" /> Generating</span>}
-                        {row.status === "done" && <span className="text-green-500 flex items-center gap-1"><CheckCircle size={10} /> Done</span>}
+                        {row.status === "generating" && <span className="text-pending flex items-center gap-1"><Loader2 size={10} className="animate-spin" /> Generating</span>}
+                        {row.status === "done" && <span className="text-foreground flex items-center gap-1"><CheckCircle size={10} /> Done</span>}
                         {row.status === "error" && <span className="text-destructive flex items-center gap-1"><XCircle size={10} /> Error</span>}
                       </td>
                       <td className="py-2 px-3">

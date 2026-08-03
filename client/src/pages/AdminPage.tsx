@@ -111,7 +111,7 @@ function TemplateRow({ template, onToggle, onToggleIsPro, onDelete }: { template
 
         {Boolean(template.isPro) && (
 
-          <span className="text-[10px] px-2 py-1 rounded-full font-medium bg-amber-500/15 text-amber-400 flex items-center gap-1">
+          <span className="text-[10px] px-2 py-1 rounded-full font-medium bg-gold/15 text-gold flex items-center gap-1">
 
             <Crown size={10} /> Pro
 
@@ -127,7 +127,7 @@ function TemplateRow({ template, onToggle, onToggleIsPro, onDelete }: { template
 
           title={template.isPro ? "Make free" : "Make Pro-only"}
 
-          className={`p-2 rounded-lg transition-colors ${template.isPro ? "text-amber-400 hover:bg-amber-500/15" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}
+          className={`p-2 rounded-lg transition-colors ${template.isPro ? "text-gold hover:bg-gold/15" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}
 
           data-testid={`button-toggle-pro-template-${template.id}`}
 
@@ -279,7 +279,7 @@ function CreateTemplateDialog({ onCreated }: { onCreated: () => void }) {
 
           <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
 
-            <input type="checkbox" checked={isPro} onChange={e => setIsPro(e.target.checked)} className="w-4 h-4 rounded cursor-pointer accent-amber-500" data-testid="checkbox-template-pro" />
+            <input type="checkbox" checked={isPro} onChange={e => setIsPro(e.target.checked)} className="w-4 h-4 rounded cursor-pointer accent-gold" data-testid="checkbox-template-pro" />
 
             Pro-only template
 

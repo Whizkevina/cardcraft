@@ -49,6 +49,12 @@
     --canvas-bg: 224 12% 13%;
     --elevated: 224 14% 16%;
 
+    /* Distinct from --gold (which means Pro/premium) — used for "needs
+       attention" states like unsaved changes, in-progress, or a queued
+       action. */
+    --pending: 28 85% 58%;
+    --pending-foreground: 224 16% 8%;
+
     /* Homepage surfaces */
     --hp-surface: 224 14% 13%;
     --hp-surface-raised: 224 13% 15%;
@@ -77,6 +83,10 @@
     --border: 40 14% 86%;
     --input: 40 12% 90%;
     --ring: 43 82% 40%;
+    /* Darker than the dark-theme value (43/90/54, ~1.7:1 on this background)
+       so `.text-gold` etc. still meet WCAG AA (~4.6:1) in light mode. */
+    --gold: 43 90% 30%;
+    --gold-soft: 43 70% 38%;
     --sidebar-background: 40 14% 95%;
     --sidebar-foreground: 224 18% 22%;
     --sidebar-primary: 43 82% 40%;
@@ -87,6 +97,10 @@
     --sidebar-ring: 43 82% 40%;
     --canvas-bg: 40 10% 90%;
     --elevated: 0 0% 100%;
+    /* Darker than the dark-theme value so text/icons using this token meet
+       WCAG AA (~4.6:1 on this background, ~4.7:1 on card) instead of 3.4:1. */
+    --pending: 28 80% 38%;
+    --pending-foreground: 40 22% 98%;
   }
 }
 

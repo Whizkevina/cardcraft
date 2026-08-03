@@ -1,5 +1,5 @@
 import { MarketingSection } from "./MarketingSection";
-import { SectionHeading } from "./SectionHeading";
+import { PageHeader } from "./PageHeader";
 import { SurfaceCard } from "./SurfaceCard";
 import { hp, hpCn } from "./homeTokens";
 
@@ -29,7 +29,8 @@ const steps = [
 export function HomeProcess() {
   return (
     <MarketingSection spacing="default">
-      <SectionHeading
+      <PageHeader
+        level="h2"
         eyebrow="Workflow"
         title="From blank to downloadable in four moves"
         description="A focused editor flow — no sprawling toolbars, no design degree required."

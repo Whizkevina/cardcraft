@@ -257,8 +257,8 @@ export function daysSince(dateStr: string | null | undefined): number {
 
 export function auditSeverityTone(severity?: string | null): string {
   if (severity === "critical") return "bg-destructive/15 text-destructive";
-  if (severity === "security") return "bg-amber-500/15 text-amber-400";
-  if (severity === "warning") return "bg-orange-500/15 text-orange-400";
+  if (severity === "security") return "bg-pending/15 text-pending";
+  if (severity === "warning") return "bg-pending/15 text-pending";
   return "bg-secondary text-muted-foreground";
 }
 

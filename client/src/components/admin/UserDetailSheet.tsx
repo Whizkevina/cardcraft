@@ -483,7 +483,7 @@ export function UserDetailSheet({
                       <div className="flex items-center justify-between gap-2 mb-1">
                         <span className="font-medium">{formatKobo(p.amount, p.currency)}</span>
                         <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium capitalize ${
-                          p.status === "success" ? "bg-green-500/15 text-green-600" :
+                          p.status === "success" ? "bg-primary/15 text-primary" :
                           p.status === "failed" ? "bg-destructive/15 text-destructive" :
                           "bg-secondary text-muted-foreground"
                         }`}>

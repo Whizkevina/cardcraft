@@ -99,7 +99,7 @@ export function AdminOpsWidgets() {
                     <p className="font-medium truncate">{u.name}</p>
                     <p className="text-[11px] text-muted-foreground truncate">{u.email}</p>
                   </div>
-                  <span className="text-[11px] font-semibold shrink-0 flex items-center gap-1 text-amber-600 dark:text-amber-400 tabular-nums">
+                  <span className="text-[11px] font-semibold shrink-0 flex items-center gap-1 text-pending tabular-nums">
                     <Users size={11} />
                     {u.projectCount}/{data.freeProjectLimit}
                   </span>

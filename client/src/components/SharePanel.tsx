@@ -530,7 +530,7 @@ function EmailSendSection({ fabricRef, projectTitle, isPro }: { fabricRef: any; 
           : <><Mail size={12} className="text-primary" /> Send Card by Email</>
         }
       </button>
-      {emailStatus === "success" && <p className="text-xs text-green-500 text-center">✓ Card delivered successfully</p>}
+      {emailStatus === "success" && <p className="text-xs text-foreground text-center">✓ Card delivered successfully</p>}
     </div>
   );
 }

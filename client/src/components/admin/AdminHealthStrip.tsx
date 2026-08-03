@@ -21,13 +21,13 @@ function HealthChip({
       className={cn(
         "flex items-center gap-2 rounded-lg border px-2.5 py-1.5 min-w-0",
         ok
-          ? "border-emerald-500/25 bg-emerald-500/5"
-          : "border-amber-500/25 bg-amber-500/5",
+          ? "border-primary/25 bg-primary/5"
+          : "border-pending/25 bg-pending/5",
       )}
     >
       <Icon
         size={13}
-        className={cn("shrink-0", ok ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400")}
+        className={cn("shrink-0", ok ? "text-primary" : "text-pending")}
       />
       <div className="min-w-0 flex-1">
         <p className="text-[11px] font-medium leading-none truncate">{label}</p>
@@ -39,8 +39,8 @@ function HealthChip({
         className={cn(
           "text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0",
           ok
-            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-            : "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+            ? "bg-primary/10 text-primary"
+            : "bg-pending/10 text-pending",
         )}
       >
         {ok ? "OK" : "Warn"}
