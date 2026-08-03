@@ -252,7 +252,7 @@ to do independently of Phase 1/3.
 - ✅ Went with the leaner, re-skinned header per the "SharePage header weight"
   decision — kept the minimal (non-`Navbar`) structure, replaced its content
   with `BrandLogo` and `hp.page`/token-based background.
-- ✅ Title now uses `hp.display` (serif) with an "Sent with CardCraft" eyebrow
+- ✅ Title now uses `hp.display` (serif) with a "Sent with CardCraft" eyebrow
   above it, replacing the plain `text-lg font-bold`.
 - ✅ Loading and error states re-skinned with the same tokens
   (`hp.display`/`hp.lead`, `hp.btnSecondary`).

@@ -138,12 +138,12 @@ export default function Navbar() {
             </DropdownMenu>
           ) : (
             <div className="flex items-center gap-2">
-              <Link href="/auth" onClick={() => trackCta("nav_sign_in")}>
-                <Button variant="ghost" size="sm" className="h-9 px-3" data-testid="button-login">Sign In</Button>
-              </Link>
-              <Link href="/templates" onClick={() => trackCta("nav_get_started")}>
-                <Button className="h-9 px-4 btn-gold shadow-none font-semibold" data-testid="button-get-started">Get Started</Button>
-              </Link>
+              <Button variant="ghost" size="sm" className="h-9 px-3" asChild>
+                <Link href="/auth" onClick={() => trackCta("nav_sign_in")} data-testid="button-login">Sign In</Link>
+              </Button>
+              <Button className="h-9 px-4 btn-gold shadow-none font-semibold" asChild>
+                <Link href="/templates" onClick={() => trackCta("nav_get_started")} data-testid="button-get-started">Get Started</Link>
+              </Button>
             </div>
           )}
         </div>

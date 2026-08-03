@@ -148,11 +148,11 @@ export default function SharePage() {
 
         {isError && (
           <div className="text-center space-y-3 max-w-sm">
-            <p className={hpCn(hp.display, "text-xl")}>Card not found</p>
+            <h1 className={hpCn(hp.display, "text-xl")}>Card not found</h1>
             <p className={hpCn(hp.lead, "text-sm")}>This link may have expired or the card doesn't exist.</p>
-            <Link href="/templates">
-              <Button variant="outline" className={hpCn(hp.btnSecondary, "h-9 px-4 text-xs")}>Browse Templates</Button>
-            </Link>
+            <Button variant="outline" className={hpCn(hp.btnSecondary, "h-9 px-4 text-xs")} asChild>
+              <Link href="/templates">Browse Templates</Link>
+            </Button>
           </div>
         )}
 
@@ -199,11 +199,9 @@ export default function SharePage() {
               <Button onClick={handleDownload} className={hpCn(hp.btnPrimary, "h-11")} disabled={!rendered}>
                 <Download size={14} /> Download PNG
               </Button>
-              <Link href="/templates">
-                <Button variant="outline" className={hpCn(hp.btnSecondary, "text-xs")}>
-                  Create Your Own
-                </Button>
-              </Link>
+              <Button variant="outline" className={hpCn(hp.btnSecondary, "text-xs")} asChild>
+                <Link href="/templates">Create Your Own</Link>
+              </Button>
             </div>
           </>
         )}

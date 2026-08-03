@@ -323,7 +323,7 @@ export default function BulkGenerate() {
               <input type="file" accept=".csv,text/csv" className="hidden" onChange={handleCSVUpload} data-testid="input-csv-upload" />
             </label>
             {rows.length > 0 && (
-              <p className="mt-3 text-xs text-primary font-medium">{rows.length} rows loaded</p>
+              <p className="mt-3 text-xs text-foreground font-medium">{rows.length} rows loaded</p>
             )}
           </div>
         </SurfaceCard>
@@ -356,7 +356,7 @@ export default function BulkGenerate() {
                       <td className="py-2 px-3">
                         {row.status === "pending" && <span className="text-muted-foreground">Pending</span>}
                         {row.status === "generating" && <span className="text-pending flex items-center gap-1"><Loader2 size={10} className="animate-spin" /> Generating</span>}
-                        {row.status === "done" && <span className="text-primary flex items-center gap-1"><CheckCircle size={10} /> Done</span>}
+                        {row.status === "done" && <span className="text-foreground flex items-center gap-1"><CheckCircle size={10} /> Done</span>}
                         {row.status === "error" && <span className="text-destructive flex items-center gap-1"><XCircle size={10} /> Error</span>}
                       </td>
                       <td className="py-2 px-3">
