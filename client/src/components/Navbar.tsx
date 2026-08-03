@@ -139,10 +139,10 @@ export default function Navbar() {
           ) : (
             <div className="flex items-center gap-2">
               <Link href="/auth" onClick={() => trackCta("nav_sign_in")}>
-                <button className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 px-3" data-testid="button-login">Sign In</button>
+                <Button variant="ghost" size="sm" className="h-9 px-3" data-testid="button-login">Sign In</Button>
               </Link>
               <Link href="/templates" onClick={() => trackCta("nav_get_started")}>
-                <button className="inline-flex items-center justify-center rounded-lg text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring h-9 px-4 btn-gold shadow-none" data-testid="button-get-started">Get Started</button>
+                <Button className="h-9 px-4 btn-gold shadow-none font-semibold" data-testid="button-get-started">Get Started</Button>
               </Link>
             </div>
           )}

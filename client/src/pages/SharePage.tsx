@@ -3,9 +3,11 @@ import { useParams, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
-import { Download, ArrowLeft, Loader2 } from "lucide-react";
+import { Download, Loader2 } from "lucide-react";
 import { useFabric } from "@/hooks/useFabric";
 import { loadDesignJson } from "@/lib/loadDesignJson";
+import { BrandLogo } from "@/components/marketing/BrandLogo";
+import { hp, hpCn } from "@/components/marketing/homeTokens";
 
 const MAX_W = 480;
 const MAX_H = 600;
@@ -126,13 +128,11 @@ export default function SharePage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <header className="border-b border-border bg-card px-4 h-12 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-          <ArrowLeft size={15} /> CardCraft
-        </Link>
+    <div className={hpCn(hp.page, "flex flex-col")}>
+      <header className="border-b border-border/60 px-4 sm:px-6 h-16 flex items-center justify-between">
+        <BrandLogo />
         {rendered && card && (
-          <Button size="sm" onClick={handleDownload} className="gap-1.5 text-xs h-8">
+          <Button size="sm" onClick={handleDownload} className={hpCn(hp.btnPrimary, "h-9 px-4 text-xs")}>
             <Download size={13} /> Download
           </Button>
         )}
@@ -147,20 +147,20 @@ export default function SharePage() {
         )}
 
         {isError && (
-          <div className="text-center space-y-3">
-            <p className="text-lg font-semibold">Card not found</p>
-            <p className="text-sm text-muted-foreground">This link may have expired or the card doesn't exist.</p>
+          <div className="text-center space-y-3 max-w-sm">
+            <p className={hpCn(hp.display, "text-xl")}>Card not found</p>
+            <p className={hpCn(hp.lead, "text-sm")}>This link may have expired or the card doesn't exist.</p>
             <Link href="/templates">
-              <Button variant="outline" size="sm">Browse Templates</Button>
+              <Button variant="outline" className={hpCn(hp.btnSecondary, "h-9 px-4 text-xs")}>Browse Templates</Button>
             </Link>
           </div>
         )}
 
         {card && (
           <>
-            <div className="text-center space-y-1">
-              <h1 className="text-lg font-bold">{card.title}</h1>
-              <p className="text-xs text-muted-foreground">Designed with CardCraft</p>
+            <div className="text-center space-y-1.5 max-w-md">
+              <p className={hp.eyebrow}>Sent with CardCraft</p>
+              <h1 className={hpCn(hp.display, "text-2xl sm:text-3xl tracking-tight")}>{card.title}</h1>
             </div>
 
             <div className="share-card-shadow rounded-sm overflow-hidden relative max-w-full">
@@ -196,11 +196,11 @@ export default function SharePage() {
             </div>
 
             <div className="flex gap-3">
-              <Button onClick={handleDownload} className="gap-1.5" disabled={!rendered}>
+              <Button onClick={handleDownload} className={hpCn(hp.btnPrimary, "h-11")} disabled={!rendered}>
                 <Download size={14} /> Download PNG
               </Button>
               <Link href="/templates">
-                <Button variant="outline" className="gap-1.5 text-xs">
+                <Button variant="outline" className={hpCn(hp.btnSecondary, "text-xs")}>
                   Create Your Own
                 </Button>
               </Link>

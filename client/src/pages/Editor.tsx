@@ -1187,7 +1187,7 @@ export default function Editor() {
           </Button>
           {user ? (
             <Button size="sm" onClick={() => saveProject.mutate()} disabled={saveProject.isPending}
-              className={`gap-1.5 text-xs h-8 ${isDirty ? "bg-amber-500 hover:bg-amber-600 text-white" : "bg-primary text-primary-foreground hover:bg-primary/90"}`} data-testid="button-save">
+              className={`gap-1.5 text-xs h-8 ${isDirty ? "bg-pending hover:bg-pending/90 text-pending-foreground" : "bg-primary text-primary-foreground hover:bg-primary/90"}`} data-testid="button-save">
               <Save size={13} /> {saveProject.isPending ? "Saving..." : isDirty ? "Save*" : "Saved"}
             </Button>
           ) : (
@@ -1265,7 +1265,7 @@ export default function Editor() {
               <canvas ref={canvasRef} id="cardcraft-canvas" data-testid="canvas-editor" />
               {/* Dirty indicator dot */}
               {isDirty && (
-                <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-amber-400 shadow" title="Unsaved changes" />
+                <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-pending shadow" title="Unsaved changes" />
               )}
               {/* Photo frame hint */}
               {showPhotoHint && (

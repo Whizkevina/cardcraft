@@ -1,8 +1,11 @@
 # Design Refresh — Scope & Build Plan
 
-**Status:** Scoped, not yet built. This is a planning/audit document only — no
-redesign code has been written. Check `git log` before assuming any step below
-is already done.
+**Status:** Phases 1, 2, and the quick items in 3/4 are done (see git log —
+"Design refresh: token cleanup, SharePage, feature grid, step language").
+Remaining: the "spot-check Gallery/Projects/AccountSettings" line in Phase 3
+and the broader hover/transition verification pass in Phase 4 haven't been
+done — those were always framed as lower-priority re-checks, not confirmed
+problems. Check `git log` before assuming anything below is still open.
 
 **Why this exists:** Users have described CardCraft's UI as "too
 AI-generated/generic," "not professional," and asked for something that feels
@@ -211,70 +214,76 @@ Calibration points are named real products, not vague adjectives.
 
 ## Prioritized action plan
 
-### Phase 1 — Design-token cleanup (foundation, do first)
+### Phase 1 — Design-token cleanup (foundation, do first) ✅ Done
 Everything else builds on this being finished; skipping it means Phase 2-3
 work has to be redone once tokens change.
-- Add a themed "pending/dirty" status color (e.g. `--warning`/`--pending` CSS
-  var alongside `--destructive` in `index.css`) and replace the 3 raw amber
-  instances (`Editor.tsx:1190`, `Editor.tsx:1268`, `AdminPage.tsx:114`,
-  `AdminPage.tsx:282`) with it.
-- Replace `BulkGenerate.tsx`'s `text-green-500`/`text-yellow-500` (lines
-  326, 358, 359) with the same token / existing `--gold`/`--destructive` as
-  appropriate.
-- Audit the rest of the codebase for the same drift beyond the files listed
-  here — this doc's grep only covered the files explicitly in scope; the
-  earlier grep (`amber-400|amber-500|yellow-500|green-500`) also hit
-  `SharePanel.tsx`, `PaymentsPage.tsx`, `AuthProvider.tsx`,
-  `admin/UserDetailSheet.tsx`, `admin/AdminShell.tsx`,
-  `admin/AdminAnalyticsLiveFeed.tsx`, `admin/AdminHealthStrip.tsx`,
-  `admin/AdminOpsWidgets.tsx`, `ImpersonationBanner.tsx`,
-  `TemplateThumbnail.tsx`, `admin/types.ts` — none of these were read in
-  detail for this doc; each needs a quick pass to classify "legitimate use"
-  (e.g. a literal color swatch preview) vs. "should be a token."
-- Consolidate `PageHeader.tsx` and `SectionHeading.tsx` (§5) into one
-  component with a `level: "h1" | "h2"` prop.
-- **Effort: 3–4 hours** (mostly mechanical once the new tokens exist; the
-  wider-codebase audit is the open-ended part).
+- ✅ Added `--pending`/`--pending-foreground` (index.css, both dark and
+  `.light` themes) — a distinct warm-orange hue, not a reuse of `--gold`, per
+  the "new distinct hue" decision — and wired it into `tailwind.config.ts` as
+  the `pending` color. Replaced the raw amber instances: `Editor.tsx` (save
+  button + dirty-dot, now `bg-pending`/`text-pending`) and `AdminPage.tsx`'s
+  Pro badge/toggle/checkbox (now `text-gold`/`bg-gold`/`accent-gold` — these
+  were "Pro" indicators, not "pending" ones, so they got the *other* existing
+  token instead; see the code, not §1, for why).
+- ✅ `BulkGenerate.tsx`'s `text-green-500`/`text-yellow-500` → `text-primary`
+  (success/loaded/done) and `text-pending` (in-progress).
+- ✅ Triaged every file the wider grep hit: `SharePanel.tsx` (kept the
+  WhatsApp icon's literal brand green, fixed the "delivered" message to
+  `text-primary`), `PaymentsPage.tsx` (status config → `pending`/`primary`),
+  `AuthProvider.tsx` (warning icon → `pending`), `admin/UserDetailSheet.tsx`,
+  `admin/AdminShell.tsx`, `admin/AdminAnalyticsLiveFeed.tsx`,
+  `admin/AdminHealthStrip.tsx`, `admin/AdminOpsWidgets.tsx`,
+  `ImpersonationBanner.tsx`, `admin/types.ts` (all → `pending`/`primary`
+  tokens). `TemplateThumbnail.tsx` turned out to have no raw-color hits on
+  re-check — false positive in the original grep. Left `admin/AdminShell.tsx`'s
+  `success`/`info` KPI tones (emerald/blue) alone — legitimate multi-color
+  dashboard semantics for a data-dense internal tool, a different case from
+  customer-facing status colors.
+- ✅ Consolidated `SectionHeading.tsx` into `PageHeader.tsx` via a
+  `level: "h1" | "h2"` prop (default `align` follows level, matching each
+  component's old default); updated `HomeFeatures.tsx`/`HomeProcess.tsx`,
+  deleted `SectionHeading.tsx`. Left `AppPageHeader.tsx` alone — on closer
+  read it's a genuinely different component (has an `action` slot, different
+  density for logged-in app pages), not a third duplicate of the same thing.
 
-### Phase 2 — Bring `SharePage.tsx` into the design system
+### Phase 2 — Bring `SharePage.tsx` into the design system ✅ Done
 Highest-visibility fix, isolated to one file plus its header, so it's safe
 to do independently of Phase 1/3.
-- Wrap in `MarketingPageShell` or a lightweight variant of it (a
-  recipient-facing share page likely still wants a leaner header, not full
-  `Navbar` — decide during build, see Open Questions).
-- Replace the plain header (line 130) with a `BrandLogo` treatment.
-- Replace `text-lg font-bold` (line 162) with `hp.display`/serif.
-- Consider adding an eyebrow/CTA footer consistent with `HomeCta.tsx`'s
-  tone ("Create Your Own" already exists at line 202 — just needs the visual
-  treatment, not new copy).
-- **Effort: 2–3 hours**, including a pass to make sure the loading/error
-  states (lines 142-157) get the same treatment.
+- ✅ Went with the leaner, re-skinned header per the "SharePage header weight"
+  decision — kept the minimal (non-`Navbar`) structure, replaced its content
+  with `BrandLogo` and `hp.page`/token-based background.
+- ✅ Title now uses `hp.display` (serif) with an "Sent with CardCraft" eyebrow
+  above it, replacing the plain `text-lg font-bold`.
+- ✅ Loading and error states re-skinned with the same tokens
+  (`hp.display`/`hp.lead`, `hp.btnSecondary`).
+- ✅ "Download PNG" / "Create Your Own" buttons now use
+  `hp.btnPrimary`/`hp.btnSecondary` instead of bare `Button` defaults.
+- **Effort spent: ~1 hour.**
 
-### Phase 3 — Core app pages: reduce template-grid feel, unify step language
-- `HomeFeatures.tsx`: apply `FeatureCard`'s existing `featured` variant to
-  one card instead of all four identical (§3, principle 4). Small change,
-  component already supports it.
-- `BulkGenerate.tsx`: replace the 3 filled-circle step badges (lines 283,
-  309, 334) with the `hp-display` numeral pattern from `HomeProcess.tsx`
-  (§4, principle 5).
-- Spot-check `Gallery.tsx`, `Projects.tsx`, `AccountSettings.tsx` for the
-  same "identical card × N" pattern once Phase 1/2 land — these already use
-  `SurfaceCard` consistently and looked reasonable in this audit, but
-  re-check after the token cleanup in case anything else surfaces.
-- **Effort: 3–5 hours.**
+### Phase 3 — Core app pages: reduce template-grid feel, unify step language 🔄 Mostly done
+- ✅ `HomeFeatures.tsx`: first card now uses `FeatureCard`'s `featured`
+  variant instead of all four identical (§3, principle 4).
+- ✅ `BulkGenerate.tsx`: the 3 filled-circle step badges are replaced with the
+  `hp-display` serif numeral pattern from `HomeProcess.tsx` (§4, principle 5).
+- ⏳ Not yet done: spot-check `Gallery.tsx`, `Projects.tsx`,
+  `AccountSettings.tsx` for the same "identical card × N" pattern now that
+  Phase 1/2 have landed — still worth a look, but wasn't a confirmed problem
+  in the original audit, just a re-check item.
+- **Effort spent: ~1 hour** (the two concrete items were small once the
+  tokens/components already existed).
 
-### Phase 4 — Polish / micro-interactions / consistency sweep
-- Replace `Navbar.tsx`'s two raw `<button>` elements (lines 142, 145) with
-  `Button` + `hp.btnPrimary`/`hp.btnSecondary` (§6).
-- Grep the full `client/src` tree for any other raw `<button className="...">`
-  that duplicates `buttonVariants` instead of using `Button` — the two in
-  `Navbar.tsx` were found incidentally; there may be more outside the files
-  read for this audit.
-- Re-verify hover/transition consistency across `template-card`,
-  `premium-card`, `.action-btn`, `.layer-item` (all already defined in
-  `index.css:430-549`) — these look considered already; this phase is a
-  verification pass, not a rebuild.
-- **Effort: 2–3 hours.**
+### Phase 4 — Polish / micro-interactions / consistency sweep 🔄 Mostly done
+- ✅ `Navbar.tsx`'s two raw `<button>` elements are now `Button` +
+  `hp.btnPrimary`/`hp.btnSecondary`-equivalent styling (§6).
+- ✅ Grepped the full `client/src` tree for other raw
+  `<button className="inline-flex items-center justify-center rounded...">`
+  duplicating `buttonVariants` — none found beyond the two in `Navbar.tsx`.
+- ⏳ Not yet done: the hover/transition consistency re-verification across
+  `template-card`, `premium-card`, `.action-btn`, `.layer-item`
+  (`index.css:430-549`) — this was always framed as a verification pass on
+  already-considered CSS, not a confirmed problem; still open if someone
+  wants to double-check.
+- **Effort spent: ~0.5 hour.**
 
 **Total estimate: 10–15 hours** across all four phases — meaningfully less
 than a full visual overhaul, because the foundation (Phase 1's target state)
