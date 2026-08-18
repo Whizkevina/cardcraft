@@ -74,7 +74,7 @@ export function HeroCardRotator({ templates, showCaption = true }: HeroCardRotat
             <p className="text-white/60 text-xs italic mt-2">Celebrating a life well lived</p>
           </div>
         </div>
-        <p className="text-center text-xs text-muted-foreground mt-3">Royal Elegance — fully customizable</p>
+        <p className="text-center text-xs text-muted-foreground mt-3">Royal Elegance, fully customizable</p>
       </>
     );
   }
@@ -105,7 +105,7 @@ export function HeroCardRotator({ templates, showCaption = true }: HeroCardRotat
         )}
         aria-live={showCaption ? "polite" : "off"}
       >
-        {current.title} — fully customizable
+        {current.title}, fully customizable
       </p>
     </>
   );
